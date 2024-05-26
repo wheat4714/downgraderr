@@ -9,8 +9,10 @@ API_KEY = ""  # Sonarr API key
 TMDB_API_KEY = ""  # TMDb API key
 PROFILE_1_NAME = "upgraded"  # Profile name for profile 1
 PROFILE_2_NAME = "downgraded"  # Profile name for profile 2
-DAYS_THRESHOLD = 999  # Number of days to check for the last airing date
+DAYS_THRESHOLD = 60  # Number of days to check for the last airing date
 RATING_THRESHOLD = 7  # Rating threshold for applying profiles
+PROFILE_1_GENRES = ["Drama", "Crime", "Documentary"]  # Genres for profile 1
+PROFILE_2_GENRES = ["Comedy", "Animation"]  # Genres for profile 2
 CACHE_DIR = "ratings_cache"  # Directory to store cached ratings
 
 def get_tmdb_rating(show_title):
