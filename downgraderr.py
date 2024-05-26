@@ -90,6 +90,14 @@ def update_profile(series_id, profile_id):
     response.raise_for_status()
     return response.json()
 
+def get_genres(series_id):
+    url = f"{SONARR_IP}/api/v3/series/{series_id}"
+    headers = {"X-Api-Key": API_KEY}
+    response = requests.get(url, headers=headers)
+    response.raise_for_status()
+    series_data = response.json()
+    return series_data.get("genres", [])
+
 def main():
     profiles = get_profiles()
     profile_1_id = get_profile_id(PROFILE_1_NAME, profiles)
@@ -101,19 +109,28 @@ def main():
         last_airing = show.get("previousAiring")
         show_title = show['title']
         tmdb_rating = get_tmdb_rating(show_title)
+        genres = get_genres(show['id'])
 
         if last_airing:
             last_airing_date = datetime.strptime(last_airing, "%Y-%m-%dT%H:%M:%SZ")
 
-            if last_airing_date > threshold_date:
-                profile_id = profile_1_id if tmdb_rating >= RATING_THRESHOLD else profile_2_id
-            else:
+            # Check if any condition from profile 2 is met
+            if last_airing_date < threshold_date:
                 profile_id = profile_2_id
-
-            print(f"Updating show '{show_title}' (ID: {show['id']}) to profile ID {profile_id} based on rating {tmdb_rating}")
-            update_profile(show['id'], profile_id)
+            else:
+                # Check if any profile 1 genre is matched
+                if any(genre in genres for genre in PROFILE_1_GENRES) and not any(genre in genres for genre in PROFILE_2_GENRES):
+                    profile_id = profile_1_id
+                else:
+                    # Default to profile 2
+                    profile_id = profile_2_id
         else:
-            print(f"Show '{show_title}' (ID: {show['id']}) has no previous airing date, skipping")
+            # Default to profile 1
+            profile_id = profile_1_id
+
+        print(f"Updating show '{show_title}' (ID: {show['id']}) to profile ID {profile_id}")
+        update_profile(show['id'], profile_id)
+
 
 if __name__ == "__main__":
     main()
