@@ -1,0 +1,2 @@
+# downgraderr
+Downgrades sonarr
