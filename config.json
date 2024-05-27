@@ -4,7 +4,7 @@
     "TMDB_API_KEY": "b3ef4c7ca4fec1df3335c897e550398b",
     "PROFILE_1_NAME": "upgraded",
     "PROFILE_2_NAME": "downgraded",
-    "DAYS_THRESHOLD": 900,
+    "DAYS_THRESHOLD": 15,
     "RATING_THRESHOLD": 7,
     "PROFILE_1_GENRES": ["Drama", "Crime", "Documentary"],
     "PROFILE_2_GENRES": ["Comedy", "Animation"],
