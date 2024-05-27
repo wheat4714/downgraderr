@@ -116,12 +116,16 @@ def main():
         if last_airing:
             last_airing_date = datetime.strptime(last_airing, "%Y-%m-%dT%H:%M:%SZ")
 
-            # Check if profile 1 genres match and last airing date matches threshold date
-            if any(genre in genres for genre in PROFILE_1_GENRES) and last_airing_date > threshold_date:
-                profile_id = profile_1_id
-            else:
-                # Default to profile 2
+            # Check if any condition from profile 2 is met
+            if last_airing_date < threshold_date or tmdb_rating < RATING_THRESHOLD:
                 profile_id = profile_2_id
+            else:
+                # Check if any profile 1 genre is matched
+                if any(genre in genres for genre in PROFILE_2_GENRES) and not any(genre in genres for genre in PROFILE_1_GENRES):
+                    profile_id = profile_2_id
+                else:
+                    # Default to profile 2
+                    profile_id = profile_1_id
         else:
             # Default to profile 2
             profile_id = profile_2_id
