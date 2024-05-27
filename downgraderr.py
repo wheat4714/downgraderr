@@ -4,13 +4,13 @@ import os
 from datetime import datetime, timedelta
 
 # User-configurable values
-SONARR_IP = ""  # Sonarr IP address
-API_KEY = ""  # Sonarr API key
-TMDB_API_KEY = ""  # TMDb API key
+SONARR_IP = "http://192.168.204.63:9595"  # Sonarr IP address
+API_KEY = "7270f10693e7462f8754d60326cc2e8a"  # Sonarr API key
+TMDB_API_KEY = "b3ef4c7ca4fec1df3335c897e550398b"  # TMDb API key
 PROFILE_1_NAME = "upgraded"  # Profile name for profile 1
 PROFILE_2_NAME = "downgraded"  # Profile name for profile 2
-DAYS_THRESHOLD = 60  # Number of days to check for the last airing date
-RATING_THRESHOLD = 7  # Rating threshold for applying profiles
+DAYS_THRESHOLD = 6000  # Number of days to check for the last airing date
+RATING_THRESHOLD = 8  # Rating threshold for applying profiles
 PROFILE_1_GENRES = ["Drama", "Crime", "Documentary"]  # Genres for profile 1
 PROFILE_2_GENRES = ["Comedy", "Animation"]  # Genres for profile 2
 CACHE_DIR = "ratings_cache"  # Directory to store cached ratings
@@ -117,7 +117,7 @@ def main():
             last_airing_date = datetime.strptime(last_airing, "%Y-%m-%dT%H:%M:%SZ")
 
             # Check if any condition from profile 2 is met
-            if last_airing_date < threshold_date:
+            if last_airing_date < threshold_date or tmdb_rating < RATING_THRESHOLD:
                 profile_id = profile_2_id
             else:
                 # Check if any profile 1 genre is matched
@@ -127,8 +127,8 @@ def main():
                     # Default to profile 2
                     profile_id = profile_2_id
         else:
-            # Default to profile 1
-            profile_id = profile_1_id
+            # Default to profile 2
+            profile_id = profile_2_id
 
         print(f"Updating show '{show_title}' (ID: {show['id']}) to profile ID {profile_id}")
         update_profile(show['id'], profile_id)
