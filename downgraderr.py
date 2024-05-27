@@ -10,7 +10,7 @@ TMDB_API_KEY = ""  # TMDb API key
 PROFILE_1_NAME = "upgraded"  # Profile name for profile 1
 PROFILE_2_NAME = "downgraded"  # Profile name for profile 2
 DAYS_THRESHOLD = 60  # Number of days to check for the last airing date
-RATING_THRESHOLD = 7  # Rating threshold for applying profiles
+RATING_THRESHOLD = 5  # Rating threshold for applying profiles
 PROFILE_1_GENRES = ["Drama", "Crime", "Documentary"]  # Genres for profile 1
 PROFILE_2_GENRES = ["Comedy", "Animation"]  # Genres for profile 2
 CACHE_DIR = "ratings_cache"  # Directory to store cached ratings
@@ -116,19 +116,15 @@ def main():
         if last_airing:
             last_airing_date = datetime.strptime(last_airing, "%Y-%m-%dT%H:%M:%SZ")
 
-            # Check if any condition from profile 2 is met
-            if last_airing_date < threshold_date:
-                profile_id = profile_2_id
+            # Check if profile 1 genres match and last airing date matches threshold date
+            if any(genre in genres for genre in PROFILE_1_GENRES) and last_airing_date > threshold_date:
+                profile_id = profile_1_id
             else:
-                # Check if any profile 1 genre is matched
-                if any(genre in genres for genre in PROFILE_1_GENRES) and not any(genre in genres for genre in PROFILE_2_GENRES):
-                    profile_id = profile_1_id
-                else:
-                    # Default to profile 2
-                    profile_id = profile_2_id
+                # Default to profile 2
+                profile_id = profile_2_id
         else:
-            # Default to profile 1
-            profile_id = profile_1_id
+            # Default to profile 2
+            profile_id = profile_2_id
 
         print(f"Updating show '{show_title}' (ID: {show['id']}) to profile ID {profile_id}")
         update_profile(show['id'], profile_id)
