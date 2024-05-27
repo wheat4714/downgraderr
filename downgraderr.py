@@ -9,8 +9,8 @@ API_KEY = "7270f10693e7462f8754d60326cc2e8a"  # Sonarr API key
 TMDB_API_KEY = "b3ef4c7ca4fec1df3335c897e550398b"  # TMDb API key
 PROFILE_1_NAME = "upgraded"  # Profile name for profile 1
 PROFILE_2_NAME = "downgraded"  # Profile name for profile 2
-DAYS_THRESHOLD = 6000  # Number of days to check for the last airing date
-RATING_THRESHOLD = 8  # Rating threshold for applying profiles
+DAYS_THRESHOLD = 30  # Number of days to check for the last airing date
+RATING_THRESHOLD = 7  # Rating threshold for applying profiles
 PROFILE_1_GENRES = ["Drama", "Crime", "Documentary"]  # Genres for profile 1
 PROFILE_2_GENRES = ["Comedy", "Animation"]  # Genres for profile 2
 CACHE_DIR = "ratings_cache"  # Directory to store cached ratings
@@ -121,11 +121,11 @@ def main():
                 profile_id = profile_2_id
             else:
                 # Check if any profile 1 genre is matched
-                if any(genre in genres for genre in PROFILE_1_GENRES) and not any(genre in genres for genre in PROFILE_2_GENRES):
-                    profile_id = profile_1_id
+                if any(genre in genres for genre in PROFILE_2_GENRES) and not any(genre in genres for genre in PROFILE_1_GENRES):
+                    profile_id = profile_2_id
                 else:
                     # Default to profile 2
-                    profile_id = profile_2_id
+                    profile_id = profile_1_id
         else:
             # Default to profile 2
             profile_id = profile_2_id
