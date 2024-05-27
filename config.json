@@ -1,0 +1,12 @@
+{
+    "SONARR_IP": "http://192.168.204.63:9595",
+    "API_KEY": "7270f10693e7462f8754d60326cc2e8a",
+    "TMDB_API_KEY": "b3ef4c7ca4fec1df3335c897e550398b",
+    "PROFILE_1_NAME": "upgraded",
+    "PROFILE_2_NAME": "downgraded",
+    "DAYS_THRESHOLD": 15,
+    "RATING_THRESHOLD": 7,
+    "PROFILE_1_GENRES": ["Drama", "Crime", "Documentary"],
+    "PROFILE_2_GENRES": ["Comedy", "Animation"],
+    "CACHE_DIR": "ratings_cache"
+}

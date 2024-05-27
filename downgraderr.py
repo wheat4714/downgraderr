@@ -2,18 +2,24 @@ import requests
 import json
 import os
 from datetime import datetime, timedelta
+import json
 
-# User-configurable values
-SONARR_IP = ""  # Sonarr IP address
-API_KEY = ""  # Sonarr API key
-TMDB_API_KEY = ""  # TMDb API key
-PROFILE_1_NAME = "upgraded"  # Profile name for profile 1
-PROFILE_2_NAME = "downgraded"  # Profile name for profile 2
-DAYS_THRESHOLD = 60  # Number of days to check for the last airing date
-RATING_THRESHOLD = 5  # Rating threshold for applying profiles
-PROFILE_1_GENRES = ["Drama", "Crime", "Documentary"]  # Genres for profile 1
-PROFILE_2_GENRES = ["Comedy", "Animation"]  # Genres for profile 2
-CACHE_DIR = "ratings_cache"  # Directory to store cached ratings
+def read_config(filename):
+    with open(filename, 'r') as file:
+        return json.load(file)
+
+config = read_config('config.json')
+
+SONARR_IP = config.get('SONARR_IP')
+API_KEY = config.get('API_KEY')
+TMDB_API_KEY = config.get('TMDB_API_KEY')
+PROFILE_1_NAME = config.get('PROFILE_1_NAME')
+PROFILE_2_NAME = config.get('PROFILE_2_NAME')
+DAYS_THRESHOLD = config.get('DAYS_THRESHOLD')
+RATING_THRESHOLD = config.get('RATING_THRESHOLD')
+PROFILE_1_GENRES = config.get('PROFILE_1_GENRES')
+PROFILE_2_GENRES = config.get('PROFILE_2_GENRES')
+CACHE_DIR = config.get('CACHE_DIR')
 
 def get_tmdb_rating(show_title):
     cache_file = os.path.join(CACHE_DIR, f"{show_title}.json")
