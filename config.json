@@ -1,0 +1,12 @@
+{
+    "SONARR_IP": "",
+    "API_KEY": "",
+    "TMDB_API_KEY": "",
+    "PROFILE_1_NAME": "upgraded",
+    "PROFILE_2_NAME": "downgraded",
+    "DAYS_THRESHOLD": 900,
+    "RATING_THRESHOLD": 7,
+    "PROFILE_1_GENRES": ["Drama", "Crime", "Documentary"],
+    "PROFILE_2_GENRES": ["Comedy", "Animation"],
+    "CACHE_DIR": "ratings_cache"
+}

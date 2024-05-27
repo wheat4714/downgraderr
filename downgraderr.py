@@ -4,12 +4,12 @@ import os
 from datetime import datetime, timedelta
 
 # User-configurable values
-SONARR_IP = ""  # Sonarr IP address
-API_KEY = ""  # Sonarr API key
-TMDB_API_KEY = ""  # TMDb API key
+SONARR_IP = "http://192.168.204.63:9595"  # Sonarr IP address
+API_KEY = "7270f10693e7462f8754d60326cc2e8a"  # Sonarr API key
+TMDB_API_KEY = "b3ef4c7ca4fec1df3335c897e550398b"  # TMDb API key
 PROFILE_1_NAME = "upgraded"  # Profile name for profile 1
 PROFILE_2_NAME = "downgraded"  # Profile name for profile 2
-DAYS_THRESHOLD = 60  # Number of days to check for the last airing date
+DAYS_THRESHOLD = 30  # Number of days to check for the last airing date
 RATING_THRESHOLD = 5  # Rating threshold for applying profiles
 PROFILE_1_GENRES = ["Drama", "Crime", "Documentary"]  # Genres for profile 1
 PROFILE_2_GENRES = ["Comedy", "Animation"]  # Genres for profile 2
