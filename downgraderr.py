@@ -1,6 +1,7 @@
 import requests
 import json
 import os
+import re
 from datetime import datetime, timedelta
 import json
 
@@ -21,8 +22,12 @@ PROFILE_1_GENRES = config.get('PROFILE_1_GENRES')
 PROFILE_2_GENRES = config.get('PROFILE_2_GENRES')
 CACHE_DIR = config.get('CACHE_DIR')
 
+def strip_year_from_title(title):
+    return re.sub(r"\s*\(\d{4}\)$", "", title).strip()
+
 def get_tmdb_rating(show_title):
-    cache_file = os.path.join(CACHE_DIR, f"{show_title}.json")
+    show_title_cleaned = strip_year_from_title(show_title)
+    cache_file = os.path.join(CACHE_DIR, f"{show_title_cleaned}.json")
     
     # Check if cached rating exists and is recent
     if os.path.exists(cache_file):
@@ -31,17 +36,19 @@ def get_tmdb_rating(show_title):
             if "timestamp" in data and "rating" in data:
                 timestamp = datetime.fromisoformat(data["timestamp"])
                 if datetime.now() - timestamp < timedelta(days=7):
-                    print(f"Using cached rating for '{show_title}'")
+                    print(f"Using cached rating for '{show_title_cleaned}'")
                     return float(data["rating"])
     
     url = f"https://api.themoviedb.org/3/search/tv"
-    params = {"api_key": TMDB_API_KEY, "query": show_title}
+    params = {"api_key": TMDB_API_KEY, "query": show_title_cleaned}
     response = requests.get(url, params=params)
     response.raise_for_status()
     data = response.json()
+
     if data["total_results"] == 0:
-        print(f"No results found for '{show_title}' on TMDb.")
+        print(f"No results found for '{show_title_cleaned}' on TMDb.")
         return 0
+    
     show_id = data["results"][0]["id"]
     url = f"https://api.themoviedb.org/3/tv/{show_id}"
     params = {"api_key": TMDB_API_KEY}
