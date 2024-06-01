@@ -133,9 +133,13 @@ def main():
             last_airing_date = datetime.min  # Set to min date if no last airing date
 
         # Determine profile based on conditions
-        if (last_airing_date < threshold_date and status.lower() != 'continuing') or tmdb_rating < RATING_THRESHOLD or (any(genre in genres for genre in PROFILE_2_GENRES) and not any(genre in genres for genre in PROFILE_1_GENRES)):
+        if ((last_airing_date < threshold_date and status.lower() != 'continuing') or 
+            tmdb_rating < RATING_THRESHOLD or 
+            (any(genre in genres for genre in PROFILE_2_GENRES) and not any(genre in genres for genre in PROFILE_1_GENRES))):
             profile_id = profile_2_id
-        elif status.lower() == 'continuing' and tmdb_rating >= RATING_THRESHOLD and any(genre in genres for genre in PROFILE_1_GENRES) and not any(genre in genres for genre in PROFILE_2_GENRES):
+        elif (status.lower() == 'continuing' and 
+              tmdb_rating >= RATING_THRESHOLD and 
+              any(genre in genres for genre in PROFILE_1_GENRES)):
             profile_id = profile_1_id
         else:
             profile_id = profile_2_id  # Default to profile 2 if no other condition is met
