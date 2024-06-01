@@ -2,12 +2,12 @@
     "SONARR_IP": "http://192.168.204.63:9595",
     "API_KEY": "e9baeecab0c04a3182cdfdc8d3e41a52",
     "TMDB_API_KEY": "b3ef4c7ca4fec1df3335c897e550398b",
-    "PROFILE_1_NAME": "upgraded",
-    "PROFILE_2_NAME": "downgraded",
-    "PROFILE_3_NAME": "standard",
+    "PROFILE_4k_NAME": "4k",
+    "PROFILE_720p_NAME": "720p",
+    "PROFILE_1080p_NAME": "1080p",
     "DAYS_THRESHOLD": 30,
-    "RATING_THRESHOLD": 8.0,
-    "PROFILE_1_GENRES": ["Action", "Drama", "Crime", "Documentary", "Science Fiction"],
-    "PROFILE_2_GENRES": ["Comedy", "Animation"],
+    "RATING_THRESHOLD": 7.5,
+    "PROFILE_4k_GENRES": ["Action", "Drama", "Crime", "Documentary", "Science Fiction"],
+    "PROFILE_720p_GENRES": ["Comedy", "Animation"],
     "CACHE_DIR": "ratings_cache"
 }
