@@ -16,6 +16,7 @@ API_KEY = config.get('API_KEY')
 TMDB_API_KEY = config.get('TMDB_API_KEY')
 PROFILE_1_NAME = config.get('PROFILE_1_NAME')
 PROFILE_2_NAME = config.get('PROFILE_2_NAME')
+PROFILE_3_NAME = config.get('PROFILE_3_NAME')
 DAYS_THRESHOLD = config.get('DAYS_THRESHOLD')
 RATING_THRESHOLD = config.get('RATING_THRESHOLD')
 PROFILE_1_GENRES = config.get('PROFILE_1_GENRES')
@@ -117,6 +118,13 @@ def main():
     profiles = get_profiles()
     profile_1_id = get_profile_id(PROFILE_1_NAME, profiles)
     profile_2_id = get_profile_id(PROFILE_2_NAME, profiles)
+    
+    PROFILE_3_NAME = config.get('PROFILE_3_NAME')
+    if not PROFILE_3_NAME:
+        raise ValueError("PROFILE_3_NAME is not set in the config file")
+        
+    profile_3_id = get_profile_id(PROFILE_3_NAME, profiles)  # Added profile_3_id
+    
     shows = get_shows()
     threshold_date = datetime.now() - timedelta(days=DAYS_THRESHOLD)
 
@@ -126,21 +134,29 @@ def main():
         tmdb_rating = get_tmdb_rating(show_title)
         genres = get_genres(show['id'])
         status = show['status']
-
+        
         if last_airing:
             last_airing_date = datetime.strptime(last_airing, "%Y-%m-%dT%H:%M:%SZ")
         else:
             last_airing_date = datetime.min  # Set to min date if no last airing date
 
         # Determine profile based on conditions
-        if ((last_airing_date < threshold_date and status.lower() != 'continuing') or 
-            tmdb_rating < RATING_THRESHOLD or 
-            (any(genre in genres for genre in PROFILE_2_GENRES) and not any(genre in genres for genre in PROFILE_1_GENRES))):
-            profile_id = profile_2_id
-        elif (status.lower() == 'continuing' and 
+        if (status.lower() == 'ended' and 
               tmdb_rating >= RATING_THRESHOLD and 
               any(genre in genres for genre in PROFILE_1_GENRES)):
+            profile_id = profile_3_id
+        elif (status.lower() == 'ended' and 
+              last_airing_date > threshold_date and
+              any(genre in genres for genre in PROFILE_1_GENRES)):
+            profile_id = profile_3_id
+        elif (status.lower() == 'continuing' and 
+              tmdb_rating >= RATING_THRESHOLD and
+              any(genre in genres for genre in PROFILE_1_GENRES)):
             profile_id = profile_1_id
+        elif ((last_airing_date > threshold_date and status.lower() == 'ended') or 
+              tmdb_rating < RATING_THRESHOLD or 
+              (any(genre in genres for genre in PROFILE_2_GENRES) and not any(genre in genres for genre in PROFILE_1_GENRES))):
+            profile_id = profile_2_id
         else:
             profile_id = profile_2_id  # Default to profile 2 if no other condition is met
 
