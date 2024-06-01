@@ -125,27 +125,23 @@ def main():
         show_title = show['title']
         tmdb_rating = get_tmdb_rating(show_title)
         genres = get_genres(show['id'])
+        status = show['status']
 
         if last_airing:
             last_airing_date = datetime.strptime(last_airing, "%Y-%m-%dT%H:%M:%SZ")
-
-            # Check if any condition from profile 2 is met
-            if last_airing_date < threshold_date or tmdb_rating < RATING_THRESHOLD:
-                profile_id = profile_2_id
-            else:
-                # Check if any profile 1 genre is matched
-                if any(genre in genres for genre in PROFILE_2_GENRES) and not any(genre in genres for genre in PROFILE_1_GENRES):
-                    profile_id = profile_2_id
-                else:
-                    # Default to profile 2
-                    profile_id = profile_1_id
         else:
-            # Default to profile 2
+            last_airing_date = datetime.min  # Set to min date if no last airing date
+
+        # Determine profile based on conditions
+        if (last_airing_date < threshold_date and status.lower() != 'continuing') or tmdb_rating < RATING_THRESHOLD or (any(genre in genres for genre in PROFILE_2_GENRES) and not any(genre in genres for genre in PROFILE_1_GENRES)):
             profile_id = profile_2_id
+        elif status.lower() == 'continuing' and tmdb_rating >= RATING_THRESHOLD and any(genre in genres for genre in PROFILE_1_GENRES) and not any(genre in genres for genre in PROFILE_2_GENRES):
+            profile_id = profile_1_id
+        else:
+            profile_id = profile_2_id  # Default to profile 2 if no other condition is met
 
         print(f"Updating show '{show_title}' (ID: {show['id']}) to profile ID {profile_id}")
         update_profile(show['id'], profile_id)
-
 
 if __name__ == "__main__":
     main()
