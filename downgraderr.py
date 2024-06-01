@@ -18,7 +18,8 @@ PROFILE_4k_NAME = config.get('PROFILE_4k_NAME')
 PROFILE_720p_NAME = config.get('PROFILE_720p_NAME')
 PROFILE_1080p_NAME = config.get('PROFILE_1080p_NAME')
 DAYS_THRESHOLD = config.get('DAYS_THRESHOLD')
-RATING_THRESHOLD = config.get('RATING_THRESHOLD')
+RATING_THRESHOLD_1080P = config.get('RATING_THRESHOLD_1080P')
+RATING_THRESHOLD_4K = config.get('RATING_THRESHOLD_4K')
 PROFILE_4k_GENRES = config.get('PROFILE_4k_GENRES')
 PROFILE_720p_GENRES = config.get('PROFILE_720p_GENRES')
 CACHE_DIR = config.get('CACHE_DIR')
@@ -137,7 +138,7 @@ def main():
 
         # Determine profile based on conditions
         if (status.lower() == 'ended' and 
-              tmdb_rating >= RATING_THRESHOLD and 
+              tmdb_rating >= RATING_THRESHOLD_1080P and 
               any(genre in genres for genre in PROFILE_4k_GENRES)):
             profile_id = profile_1080p_id
         elif (status.lower() == 'ended' and 
@@ -145,11 +146,15 @@ def main():
               any(genre in genres for genre in PROFILE_4k_GENRES)):
             profile_id = profile_1080p_id
         elif (status.lower() == 'continuing' and 
-              tmdb_rating >= RATING_THRESHOLD and
+              tmdb_rating >= RATING_THRESHOLD_4K and
               any(genre in genres for genre in PROFILE_4k_GENRES)):
             profile_id = profile_4k_id
+        elif (status.lower() == 'continuing' and 
+              tmdb_rating >= RATING_THRESHOLD_1080P and
+              any(genre in genres for genre in PROFILE_4k_GENRES)):
+            profile_id = profile_1080p_id
         elif ((last_airing_date > threshold_date and status.lower() == 'ended') or 
-              tmdb_rating < RATING_THRESHOLD or 
+              tmdb_rating < RATING_THRESHOLD_1080P or 
               (any(genre in genres for genre in PROFILE_720p_GENRES) and not any(genre in genres for genre in PROFILE_4k_GENRES))):
             profile_id = profile_720p_id
         else:
