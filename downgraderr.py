@@ -14,13 +14,13 @@ config = read_config('config.json')
 SONARR_IP = config.get('SONARR_IP')
 API_KEY = config.get('API_KEY')
 TMDB_API_KEY = config.get('TMDB_API_KEY')
-PROFILE_1_NAME = config.get('PROFILE_1_NAME')
-PROFILE_2_NAME = config.get('PROFILE_2_NAME')
-PROFILE_3_NAME = config.get('PROFILE_3_NAME')
+PROFILE_4k_NAME = config.get('PROFILE_4k_NAME')
+PROFILE_720p_NAME = config.get('PROFILE_720p_NAME')
+PROFILE_1080p_NAME = config.get('PROFILE_1080p_NAME')
 DAYS_THRESHOLD = config.get('DAYS_THRESHOLD')
 RATING_THRESHOLD = config.get('RATING_THRESHOLD')
-PROFILE_1_GENRES = config.get('PROFILE_1_GENRES')
-PROFILE_2_GENRES = config.get('PROFILE_2_GENRES')
+PROFILE_4k_GENRES = config.get('PROFILE_4k_GENRES')
+PROFILE_720p_GENRES = config.get('PROFILE_720p_GENRES')
 CACHE_DIR = config.get('CACHE_DIR')
 
 def strip_year_from_title(title):
@@ -116,14 +116,9 @@ def get_genres(series_id):
 
 def main():
     profiles = get_profiles()
-    profile_1_id = get_profile_id(PROFILE_1_NAME, profiles)
-    profile_2_id = get_profile_id(PROFILE_2_NAME, profiles)
-    
-    PROFILE_3_NAME = config.get('PROFILE_3_NAME')
-    if not PROFILE_3_NAME:
-        raise ValueError("PROFILE_3_NAME is not set in the config file")
-        
-    profile_3_id = get_profile_id(PROFILE_3_NAME, profiles)  # Added profile_3_id
+    profile_4k_id = get_profile_id(PROFILE_4k_NAME, profiles)
+    profile_720p_id = get_profile_id(PROFILE_720p_NAME, profiles)
+    profile_1080p_id = get_profile_id(PROFILE_1080p_NAME, profiles)
     
     shows = get_shows()
     threshold_date = datetime.now() - timedelta(days=DAYS_THRESHOLD)
@@ -143,22 +138,22 @@ def main():
         # Determine profile based on conditions
         if (status.lower() == 'ended' and 
               tmdb_rating >= RATING_THRESHOLD and 
-              any(genre in genres for genre in PROFILE_1_GENRES)):
-            profile_id = profile_3_id
+              any(genre in genres for genre in PROFILE_4k_GENRES)):
+            profile_id = profile_1080p_id
         elif (status.lower() == 'ended' and 
               last_airing_date > threshold_date and
-              any(genre in genres for genre in PROFILE_1_GENRES)):
-            profile_id = profile_3_id
+              any(genre in genres for genre in PROFILE_4k_GENRES)):
+            profile_id = profile_1080p_id
         elif (status.lower() == 'continuing' and 
               tmdb_rating >= RATING_THRESHOLD and
-              any(genre in genres for genre in PROFILE_1_GENRES)):
-            profile_id = profile_1_id
+              any(genre in genres for genre in PROFILE_4k_GENRES)):
+            profile_id = profile_4k_id
         elif ((last_airing_date > threshold_date and status.lower() == 'ended') or 
               tmdb_rating < RATING_THRESHOLD or 
-              (any(genre in genres for genre in PROFILE_2_GENRES) and not any(genre in genres for genre in PROFILE_1_GENRES))):
-            profile_id = profile_2_id
+              (any(genre in genres for genre in PROFILE_720p_GENRES) and not any(genre in genres for genre in PROFILE_4k_GENRES))):
+            profile_id = profile_720p_id
         else:
-            profile_id = profile_2_id  # Default to profile 2 if no other condition is met
+            profile_id = profile_720p_id  # Default to profile 2 if no other condition is met
 
         print(f"Updating show '{show_title}' (ID: {show['id']}) to profile ID {profile_id}")
         update_profile(show['id'], profile_id)
