@@ -3,14 +3,15 @@ import json
 import os
 import re
 from datetime import datetime, timedelta
-import json
 
 def read_config(filename):
     with open(filename, 'r') as file:
         return json.load(file)
 
+# Read configuration from file
 config = read_config('config.json')
 
+# Configuration variables
 SONARR_IP = config.get('SONARR_IP')
 API_KEY = config.get('API_KEY')
 TMDB_API_KEY = config.get('TMDB_API_KEY')
@@ -25,9 +26,11 @@ PROFILE_720p_GENRES = config.get('PROFILE_720p_GENRES')
 CACHE_DIR = config.get('CACHE_DIR')
 EPISODE_THRESHOLD_1080P = config.get ('EPISODE_THRESHOLD_1080P')
 
+# Remove the year from the show title if present.
 def strip_year_from_title(title):
     return re.sub(r"\s*\(\d{4}\)$", "", title).strip()
 
+# Fetch the TMDB rating for a given show title, using cached data if available.
 def get_tmdb_rating(show_title):
     show_title_cleaned = strip_year_from_title(show_title)
     cache_file = os.path.join(CACHE_DIR, f"{show_title_cleaned}.json")
@@ -41,7 +44,8 @@ def get_tmdb_rating(show_title):
                 if datetime.now() - timestamp < timedelta(days=7):
                     print(f"Using cached rating for '{show_title_cleaned}'")
                     return float(data["rating"])
-    
+                
+    # Fetch rating from TMDB API
     url = f"https://api.themoviedb.org/3/search/tv"
     params = {"api_key": TMDB_API_KEY, "query": show_title_cleaned}
     response = requests.get(url, params=params)
@@ -68,7 +72,7 @@ def get_tmdb_rating(show_title):
     
     return rating
 
-
+# Fetch quality profiles from Sonarr.
 def get_profiles():
     url = f"{SONARR_IP}/api/v3/qualityprofile"
     headers = {"X-Api-Key": API_KEY}
@@ -76,12 +80,14 @@ def get_profiles():
     response.raise_for_status()
     return response.json()
 
+# Get the profile ID for a given profile name.
 def get_profile_id(profile_name, profiles):
     for profile in profiles:
         if profile['name'].lower() == profile_name.lower():
             return profile['id']
     raise ValueError(f"Profile name '{profile_name}' not found")
 
+# Fetch all shows from Sonarr.
 def get_shows():
     url = f"{SONARR_IP}/api/v3/series"
     headers = {"X-Api-Key": API_KEY}
@@ -89,6 +95,7 @@ def get_shows():
     response.raise_for_status()
     return response.json()
 
+# Fetch detailed series information from Sonarr.
 def get_series(series_id):
     url = f"{SONARR_IP}/api/v3/series/{series_id}"
     headers = {"X-Api-Key": API_KEY}
@@ -96,18 +103,18 @@ def get_series(series_id):
     response.raise_for_status()
     return response.json()
 
-def update_profile(series_id, profile_id):
-    # Get the full series data
+# Update the quality profile for a given series.
+def update_profile(series_id, profile_id):  
     series_data = get_series(series_id)
-    # Update the quality profile ID
     series_data['qualityProfileId'] = profile_id
-    
+
     url = f"{SONARR_IP}/api/v3/series/{series_id}"
     headers = {"X-Api-Key": API_KEY}
     response = requests.put(url, headers=headers, json=series_data)
     response.raise_for_status()
     return response.json()
 
+# Fetch genres for a given series.
 def get_genres(series_id):
     url = f"{SONARR_IP}/api/v3/series/{series_id}"
     headers = {"X-Api-Key": API_KEY}
@@ -116,7 +123,7 @@ def get_genres(series_id):
     series_data = response.json()
     return series_data.get("genres", [])
 
-# Function to query Sonarr API and get the number of episodes for a show
+# Fetch the total number of episodes for a given show.
 def get_number_of_episodes(show_id):
     sonarr_url = f"{SONARR_IP}/api/v3/series/{show_id}"
     headers = {"X-Api-Key": API_KEY}
@@ -126,12 +133,9 @@ def get_number_of_episodes(show_id):
         data = response.json()
         total_episodes = sum(season['statistics']['episodeCount'] for season in data['seasons'])
         return total_episodes
-    else:
-        # Handle error response
-        print("Error:", response.text)  # Print error response for debugging
-        return None
 
 def main():
+    # Fetch profiles and their IDs
     profiles = get_profiles()
     profile_4k_id = get_profile_id(PROFILE_4k_NAME, profiles)
     profile_720p_id = get_profile_id(PROFILE_720p_NAME, profiles)
