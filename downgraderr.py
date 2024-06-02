@@ -40,7 +40,7 @@ TMDB_API_KEY = config.get('TMDB_API_KEY')
 PROFILE_4k_NAME = config.get('PROFILE_4k_NAME')
 PROFILE_720p_NAME = config.get('PROFILE_720p_NAME')
 PROFILE_1080p_NAME = config.get('PROFILE_1080p_NAME')
-DAYS_THRESHOLD = config.get('DAYS_THRESHOLD')
+DOWNGRADE_DAYS_THRESHOLD = config.get('DOWNGRADE_DAYS_THRESHOLD')
 RATING_THRESHOLD_1080P = config.get('RATING_THRESHOLD_1080P')
 RATING_THRESHOLD_4K = config.get('RATING_THRESHOLD_4K')
 PROFILE_4k_GENRES = set(config.get('PROFILE_4k_GENRES', []))  # Convert to set
@@ -209,7 +209,7 @@ async def main():
         )
         
         shows = await get_shows(session)
-        threshold_date = datetime.now() - timedelta(days=DAYS_THRESHOLD)
+        threshold_date = datetime.now() - timedelta(days=DOWNGRADE_DAYS_THRESHOLD)
         
         tasks = [process_show(session, show, threshold_date, profile_ids) for show in shows]
         await asyncio.gather(*tasks)
