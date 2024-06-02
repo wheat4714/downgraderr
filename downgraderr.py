@@ -194,12 +194,11 @@ def determine_profile_id(status: str, tmdb_rating: float, last_airing_date: date
         last_airing_year >= YEAR_THRESHOLD_4K and
         PROFILE_4k_GENRES.intersection(genres_set)):
         return profile_4k_id
-        
+    
     elif (status.lower() == 'ended' and 
-        tmdb_rating >= RATING_THRESHOLD_1080P and 
-        num_episodes < EPISODE_THRESHOLD_1080P and
-        last_airing_year >= YEAR_THRESHOLD_1080P and
-        (PROFILE_1080P_GENRES.intersection(genres_set) or PROFILE_4k_GENRES.intersection(genres_set))):
+          num_episodes < EPISODE_THRESHOLD_1080P and 
+          last_airing_year >= YEAR_THRESHOLD_1080P and                   
+          (PROFILE_1080P_GENRES.intersection(genres_set) or PROFILE_4k_GENRES.intersection(genres_set))):
         return profile_1080p_id
     
     elif (status.lower() == 'continuing' and 
@@ -207,14 +206,7 @@ def determine_profile_id(status: str, tmdb_rating: float, last_airing_date: date
           num_episodes < EPISODE_THRESHOLD_1080P and
           last_airing_year >= YEAR_THRESHOLD_1080P and          
           (PROFILE_1080P_GENRES.intersection(genres_set) or PROFILE_4k_GENRES.intersection(genres_set))):
-        return profile_1080p_id    
-    
-    elif (status.lower() == 'ended' and 
-          last_airing_date > threshold_date and
-          num_episodes < EPISODE_THRESHOLD_1080P and 
-          last_airing_year >= YEAR_THRESHOLD_1080P and                   
-          (PROFILE_1080P_GENRES.intersection(genres_set) or PROFILE_4k_GENRES.intersection(genres_set))):
-        return profile_1080p_id
+        return profile_1080p_id        
 
     elif (tmdb_rating <= RATING_THRESHOLD_1080P or
           num_episodes > EPISODE_THRESHOLD_1080P or
