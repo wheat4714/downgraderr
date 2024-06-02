@@ -8,9 +8,9 @@
     "PROFILE_4k_GENRES": ["Action", "Drama", "Crime", "Documentary", "Science Fiction", "Fantasy"],
     "RATING_THRESHOLD_4K": 8.0,
 
-    
     "PROFILE_1080p_NAME": "1080p",
     "RATING_THRESHOLD_1080P": 7.0,
+    "EPISODE_THRESHOLD_1080P": 250,
 
     "PROFILE_720p_NAME": "720p",
     "PROFILE_720p_GENRES": ["Comedy", "Animation"],
