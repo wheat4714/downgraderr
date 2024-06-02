@@ -132,6 +132,32 @@ def get_number_of_episodes(show_id):
     total_episodes = sum(season['statistics']['episodeCount'] for season in data['seasons'])
     return total_episodes
 
+def determine_profile_id(status, tmdb_rating, last_airing_date, genres, num_episodes, threshold_date, profile_4k_id, profile_1080p_id, profile_720p_id):
+    if (status.lower() == 'ended' and 
+        tmdb_rating >= RATING_THRESHOLD_1080P and 
+        num_episodes < EPISODE_THRESHOLD_1080P and
+        any(genre in genres for genre in PROFILE_4k_GENRES)):
+        return profile_1080p_id
+    elif (status.lower() == 'ended' and 
+          last_airing_date > threshold_date and
+          any(genre in genres for genre in PROFILE_4k_GENRES)):
+        return profile_1080p_id
+    elif (status.lower() == 'continuing' and 
+          tmdb_rating >= RATING_THRESHOLD_4K and
+          any(genre in genres for genre in PROFILE_4k_GENRES)):
+        return profile_4k_id
+    elif (status.lower() == 'continuing' and 
+          tmdb_rating >= RATING_THRESHOLD_1080P and
+          num_episodes < EPISODE_THRESHOLD_1080P and
+          any(genre in genres for genre in PROFILE_4k_GENRES)):
+        return profile_1080p_id
+    elif ((last_airing_date > threshold_date and status.lower() == 'ended') or 
+          tmdb_rating < RATING_THRESHOLD_1080P or 
+          (any(genre in genres for genre in PROFILE_720p_GENRES) and not any(genre in genres for genre in PROFILE_4k_GENRES))):
+        return profile_720p_id
+    else:
+        return profile_720p_id  # Default to profile 720p if no other condition is met
+
 def main():
     # Fetch profiles and their IDs
     profiles = get_profiles()
@@ -156,31 +182,8 @@ def main():
         else:
             last_airing_date = datetime.min  # Set to min date if no last airing date
 
-    # Determine profile based on conditions
-        if (status.lower() == 'ended' and 
-              tmdb_rating >= RATING_THRESHOLD_1080P and 
-              num_episodes < EPISODE_THRESHOLD_1080P and
-              any(genre in genres for genre in PROFILE_4k_GENRES)):
-            profile_id = profile_1080p_id
-        elif (status.lower() == 'ended' and 
-              last_airing_date > threshold_date and
-              any(genre in genres for genre in PROFILE_4k_GENRES)):
-            profile_id = profile_1080p_id
-        elif (status.lower() == 'continuing' and 
-              tmdb_rating >= RATING_THRESHOLD_4K and
-              any(genre in genres for genre in PROFILE_4k_GENRES)):
-            profile_id = profile_4k_id
-        elif (status.lower() == 'continuing' and 
-              tmdb_rating >= RATING_THRESHOLD_1080P and
-              num_episodes < EPISODE_THRESHOLD_1080P and
-              any(genre in genres for genre in PROFILE_4k_GENRES)):
-            profile_id = profile_1080p_id
-        elif ((last_airing_date > threshold_date and status.lower() == 'ended') or 
-              tmdb_rating < RATING_THRESHOLD_1080P or 
-              (any(genre in genres for genre in PROFILE_720p_GENRES) and not any(genre in genres for genre in PROFILE_4k_GENRES))):
-            profile_id = profile_720p_id
-        else:
-            profile_id = profile_720p_id  # Default to profile 720p if no other condition is met
+        # Determine profile based on conditions
+        profile_id = determine_profile_id(status, tmdb_rating, last_airing_date, genres, num_episodes, threshold_date, profile_4k_id, profile_1080p_id, profile_720p_id)
 
         print(f"Updating show '{show_title}' (ID: {show['id']}) to profile ID {profile_id}")
         update_profile(show['id'], profile_id)
