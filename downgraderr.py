@@ -174,6 +174,7 @@ def determine_profile_id(status: str, tmdb_rating: float, last_airing_date: date
         return profile_1080p_id
     elif (status.lower() == 'ended' and 
           last_airing_date > threshold_date and
+          num_episodes < EPISODE_THRESHOLD_1080P and          
           (PROFILE_1080P_GENRES.intersection(genres_set) or PROFILE_4k_GENRES.intersection(genres_set))):
         return profile_1080p_id
     elif (status.lower() == 'continuing' and 
@@ -186,8 +187,12 @@ def determine_profile_id(status: str, tmdb_rating: float, last_airing_date: date
           num_episodes < EPISODE_THRESHOLD_1080P and
           (PROFILE_1080P_GENRES.intersection(genres_set) or PROFILE_4k_GENRES.intersection(genres_set))):
         return profile_1080p_id
+    elif (tmdb_rating <= RATING_THRESHOLD_1080P or
+          num_episodes > EPISODE_THRESHOLD_1080P or
+          PROFILE_720p_GENRES.intersection(genres_set)):     
+        return profile_720p_id
     else:
-        return profile_720p_id  # Default to profile 720p if no other condition is met
+        return profile_1080p_id  # Default to profile 720p if no other condition is met
     
 async def process_show(session, show, threshold_date, profile_ids):
     last_airing = show.get("previousAiring")
