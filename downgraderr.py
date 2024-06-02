@@ -49,6 +49,8 @@ CACHE_DIR = config.get('CACHE_DIR')
 EPISODE_THRESHOLD_1080P = config.get ('EPISODE_THRESHOLD_1080P')
 EPISODE_THRESHOLD_4K = config.get ('EPISODE_THRESHOLD_4K')
 PROFILE_1080P_GENRES = set(config.get('PROFILE_1080P_GENRES', []))  # Convert to set
+YEAR_THRESHOLD_4K = config.get('YEAR_THRESHOLD_4K')  # Year threshold for 4K
+YEAR_THRESHOLD_1080P = config.get('YEAR_THRESHOLD_1080P')  # Year threshold for 1080p
 
 # Constants for API endpoints
 SONARR_API_URL = f"{config.get('SONARR_IP')}/api/v3"
@@ -165,49 +167,65 @@ async def get_number_of_episodes(session, show_id: int) -> int:
     total_episodes = sum(season['statistics']['episodeCount'] for season in data['seasons'])
     return total_episodes
 
-def determine_profile_id(status: str, tmdb_rating: float, last_airing_date: datetime, genres: List[str], num_episodes: int, threshold_date: datetime, profile_4k_id: int, profile_1080p_id: int, profile_720p_id: int) -> int:
+# Fetch the last airing year for a given show.
+async def get_last_airing_year(session, show_id: int) -> int:
+    headers = {"X-Api-Key": API_KEY}
+    data = await fetch_with_retries(session, f"{SONARR_API_URL}/series/{show_id}", headers=headers)
+    last_airing = data.get("previousAiring")
+    if last_airing:
+        last_airing_year = datetime.strptime(last_airing, "%Y-%m-%dT%H:%M:%SZ").year
+        return last_airing_year
+    return 0
+
+def determine_profile_id(status: str, tmdb_rating: float, last_airing_date: datetime, genres: List[str], num_episodes: int, threshold_date: datetime, last_airing_year: int, year_threshold_4k: int, year_threshold_1080p: int, profile_4k_id: int, profile_1080p_id: int, profile_720p_id: int) -> int:
     genres_set = set(genres)
 
     if (status.lower() == 'ended' and 
         tmdb_rating >= RATING_THRESHOLD_4K and 
         last_airing_date > threshold_date and
         num_episodes < EPISODE_THRESHOLD_4K and
+        last_airing_year >= YEAR_THRESHOLD_4K and
         PROFILE_4k_GENRES.intersection(genres_set)):
         return profile_4k_id
     
     elif (status.lower() == 'continuing' and 
-          tmdb_rating >= RATING_THRESHOLD_4K and
-          num_episodes < EPISODE_THRESHOLD_4K and
-          PROFILE_4k_GENRES.intersection(genres_set)):
+        tmdb_rating >= RATING_THRESHOLD_4K and
+        num_episodes < EPISODE_THRESHOLD_4K and
+        last_airing_year >= YEAR_THRESHOLD_4K and
+        PROFILE_4k_GENRES.intersection(genres_set)):
         return profile_4k_id
         
     elif (status.lower() == 'ended' and 
         tmdb_rating >= RATING_THRESHOLD_1080P and 
         num_episodes < EPISODE_THRESHOLD_1080P and
+        last_airing_year >= YEAR_THRESHOLD_1080P and
         (PROFILE_1080P_GENRES.intersection(genres_set) or PROFILE_4k_GENRES.intersection(genres_set))):
         return profile_1080p_id
     
     elif (status.lower() == 'continuing' and 
           tmdb_rating >= RATING_THRESHOLD_1080P and
           num_episodes < EPISODE_THRESHOLD_1080P and
+          last_airing_year >= YEAR_THRESHOLD_1080P and          
           (PROFILE_1080P_GENRES.intersection(genres_set) or PROFILE_4k_GENRES.intersection(genres_set))):
         return profile_1080p_id    
     
     elif (status.lower() == 'ended' and 
           last_airing_date > threshold_date and
-          num_episodes < EPISODE_THRESHOLD_1080P and          
+          num_episodes < EPISODE_THRESHOLD_1080P and 
+          last_airing_year >= YEAR_THRESHOLD_1080P and                   
           (PROFILE_1080P_GENRES.intersection(genres_set) or PROFILE_4k_GENRES.intersection(genres_set))):
         return profile_1080p_id
 
     elif (tmdb_rating <= RATING_THRESHOLD_1080P or
           num_episodes > EPISODE_THRESHOLD_1080P or
+          last_airing_year < YEAR_THRESHOLD_1080P or
           PROFILE_720p_GENRES.intersection(genres_set)):     
         return profile_720p_id
     
     else:
         return profile_1080p_id  # Default to profile 1080p if no other condition is met
     
-async def process_show(session, show, threshold_date, profile_ids):
+async def process_show(session, show, threshold_date, profile_ids, year_threshold_4k, year_threshold_1080p):
     last_airing = show.get("previousAiring")
     show_title = show['title']
     tmdb_rating = await get_tmdb_rating(session, show_title)
@@ -215,15 +233,16 @@ async def process_show(session, show, threshold_date, profile_ids):
     status = show['status']
     show_id = show['id']
     num_episodes = await get_number_of_episodes(session, show_id)
+    last_airing_year = await get_last_airing_year(session, show_id)
     
     if last_airing:
         last_airing_date = datetime.strptime(last_airing, "%Y-%m-%dT%H:%M:%SZ")
     else:
         last_airing_date = datetime.min
 
-    profile_id = determine_profile_id(status, tmdb_rating, last_airing_date, genres, num_episodes, threshold_date, *profile_ids)
+    profile_id = determine_profile_id(status, tmdb_rating, last_airing_date, genres, num_episodes, threshold_date, last_airing_year, year_threshold_4k, year_threshold_1080p, *profile_ids)
     logging.info(f"Updating show '{show_title}' (ID: {show['id']}) to profile ID {profile_id}")
-    await update_profile(session, show['id'], profile_id)    
+    await update_profile(session, show['id'], profile_id)  
 
 async def main():
     async with aiohttp.ClientSession() as session:
@@ -237,7 +256,7 @@ async def main():
         shows = await get_shows(session)
         threshold_date = datetime.now() - timedelta(days=DOWNGRADE_DAYS_THRESHOLD)
         
-        tasks = [process_show(session, show, threshold_date, profile_ids) for show in shows]
+        tasks = [process_show(session, show, threshold_date, profile_ids, YEAR_THRESHOLD_4K, YEAR_THRESHOLD_1080P) for show in shows]
         await asyncio.gather(*tasks)
 
 if __name__ == "__main__":
