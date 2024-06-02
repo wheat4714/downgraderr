@@ -192,7 +192,7 @@ def determine_profile_id(status: str, tmdb_rating: float, last_airing_date: date
           PROFILE_720p_GENRES.intersection(genres_set)):     
         return profile_720p_id
     else:
-        return profile_1080p_id  # Default to profile 720p if no other condition is met
+        return profile_1080p_id  # Default to profile 1080p if no other condition is met
     
 async def process_show(session, show, threshold_date, profile_ids):
     last_airing = show.get("previousAiring")
