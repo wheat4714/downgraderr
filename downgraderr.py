@@ -1,10 +1,25 @@
-import requests
-import json
-import os
-import re
-import logging
-import aiohttp
-import asyncio
+import subprocess
+
+# Define a dictionary with required packages and imported modules
+dependencies = {
+    'packages': ['requests', 'aiohttp'],
+    'modules': ['json', 'os', 're', 'logging', 'asyncio', 'typing', 'aiohttp', 'datetime']
+}
+
+# Check and install required packages
+for package in dependencies['packages']:
+    try:
+        __import__(package)
+    except ImportError:
+        print(f"{package} is not installed. Installing...")
+        subprocess.check_call(['pip', 'install', package])
+        print(f"{package} installed successfully.")
+
+# Import required modules
+for module in dependencies['modules']:
+    globals()[module] = __import__(module)
+
+# Import specific items from modules
 from typing import List, Dict, Any
 from datetime import datetime, timedelta
 
