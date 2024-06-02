@@ -47,6 +47,7 @@ PROFILE_4k_GENRES = set(config.get('PROFILE_4k_GENRES', []))  # Convert to set
 PROFILE_720p_GENRES = set(config.get('PROFILE_720p_GENRES', []))  # Convert to set
 CACHE_DIR = config.get('CACHE_DIR')
 EPISODE_THRESHOLD_1080P = config.get ('EPISODE_THRESHOLD_1080P')
+EPISODE_THRESHOLD_4K = config.get ('EPISODE_THRESHOLD_4K')
 
 # Constants for API endpoints
 SONARR_API_URL = f"{config.get('SONARR_IP')}/api/v3"
@@ -176,6 +177,7 @@ def determine_profile_id(status: str, tmdb_rating: float, last_airing_date: date
         return profile_1080p_id
     elif (status.lower() == 'continuing' and 
           tmdb_rating >= RATING_THRESHOLD_4K and
+          num_episodes < EPISODE_THRESHOLD_4K and
           PROFILE_4k_GENRES.intersection(genres_set)):
         return profile_4k_id
     elif (status.lower() == 'continuing' and 
