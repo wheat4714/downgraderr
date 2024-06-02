@@ -48,6 +48,7 @@ PROFILE_720p_GENRES = set(config.get('PROFILE_720p_GENRES', []))  # Convert to s
 CACHE_DIR = config.get('CACHE_DIR')
 EPISODE_THRESHOLD_1080P = config.get ('EPISODE_THRESHOLD_1080P')
 EPISODE_THRESHOLD_4K = config.get ('EPISODE_THRESHOLD_4K')
+PROFILE_1080P_GENRES = set(config.get('PROFILE_1080P_GENRES', []))  # Convert to set
 
 # Constants for API endpoints
 SONARR_API_URL = f"{config.get('SONARR_IP')}/api/v3"
@@ -169,11 +170,11 @@ def determine_profile_id(status: str, tmdb_rating: float, last_airing_date: date
     if (status.lower() == 'ended' and 
         tmdb_rating >= RATING_THRESHOLD_1080P and 
         num_episodes < EPISODE_THRESHOLD_1080P and
-        PROFILE_4k_GENRES.intersection(genres_set)):
+        (PROFILE_1080P_GENRES.intersection(genres_set) or PROFILE_4k_GENRES.intersection(genres_set))):
         return profile_1080p_id
     elif (status.lower() == 'ended' and 
           last_airing_date > threshold_date and
-          PROFILE_4k_GENRES.intersection(genres_set)):
+          (PROFILE_1080P_GENRES.intersection(genres_set) or PROFILE_4k_GENRES.intersection(genres_set))):
         return profile_1080p_id
     elif (status.lower() == 'continuing' and 
           tmdb_rating >= RATING_THRESHOLD_4K and
@@ -183,12 +184,8 @@ def determine_profile_id(status: str, tmdb_rating: float, last_airing_date: date
     elif (status.lower() == 'continuing' and 
           tmdb_rating >= RATING_THRESHOLD_1080P and
           num_episodes < EPISODE_THRESHOLD_1080P and
-          PROFILE_4k_GENRES.intersection(genres_set)):
+          (PROFILE_1080P_GENRES.intersection(genres_set) or PROFILE_4k_GENRES.intersection(genres_set))):
         return profile_1080p_id
-    elif ((last_airing_date > threshold_date and status.lower() == 'ended') or 
-          tmdb_rating < RATING_THRESHOLD_1080P or 
-          (PROFILE_720p_GENRES.intersection(genres_set) and not PROFILE_4k_GENRES.intersection(genres_set))):
-        return profile_720p_id
     else:
         return profile_720p_id  # Default to profile 720p if no other condition is met
     
