@@ -52,6 +52,10 @@ EPISODE_THRESHOLD_1080P = config.get ('EPISODE_THRESHOLD_1080P')
 SONARR_API_URL = f"{config.get('SONARR_IP')}/api/v3"
 TMDB_API_URL = "https://api.themoviedb.org/3"
 
+# Retry settings
+MAX_RETRIES = 3
+RETRY_DELAY = 2  # in seconds
+
 # Remove the year from the show title if present.
 def strip_year_from_title(title: str) -> tuple[str, int]:
     match = re.search(r"\((\d{4})\)$", title)
@@ -60,6 +64,18 @@ def strip_year_from_title(title: str) -> tuple[str, int]:
         title_cleaned = re.sub(r"\s*\(\d{4}\)$", "", title).strip()
         return title_cleaned, year
     return title, None
+
+# Helper function to make HTTP requests with retries
+async def fetch_with_retries(session, url, params=None, headers=None):
+    for attempt in range(MAX_RETRIES):
+        try:
+            async with session.get(url, params=params, headers=headers) as response:
+                response.raise_for_status()
+                return await response.json()
+        except (aiohttp.ClientError, aiohttp.ClientConnectionError) as e:
+            logging.warning(f"Request failed ({e}), retrying in {RETRY_DELAY} seconds...")
+            await asyncio.sleep(RETRY_DELAY)
+    raise Exception(f"Failed to fetch data from {url} after {MAX_RETRIES} retries.")
 
 # Fetch the TMDB rating for a given show title, using cached data if available.
 async def get_tmdb_rating(session, show_title: str) -> float:
@@ -71,8 +87,7 @@ async def get_tmdb_rating(session, show_title: str) -> float:
     if year:
         params["first_air_date_year"] = year
 
-    async with session.get(f"{TMDB_API_URL}/search/tv", params=params) as response:
-        data = await response.json()
+    data = await fetch_with_retries(session, f"{TMDB_API_URL}/search/tv", params=params)
 
     if data["total_results"] == 0:
         logging.warning(f"No results found for '{show_title_cleaned}' on TMDb.")
@@ -91,9 +106,8 @@ async def get_tmdb_rating(session, show_title: str) -> float:
                     logging.info(f"Using cached rating for TMDB ID '{show_id}'")
                     return float(cached_data["rating"])
     
-    async with session.get(f"{TMDB_API_URL}/tv/{show_id}", params={"api_key": TMDB_API_KEY}) as response:
-        show_data = await response.json()
-        rating = show_data["vote_average"]
+    show_data = await fetch_with_retries(session, f"{TMDB_API_URL}/tv/{show_id}", params={"api_key": TMDB_API_KEY})
+    rating = show_data["vote_average"]
     
     # Cache the rating
     cache_data = {"rating": rating, "timestamp": datetime.now().isoformat()}
@@ -105,8 +119,7 @@ async def get_tmdb_rating(session, show_title: str) -> float:
 # Fetch quality profiles from Sonarr.
 async def get_profiles(session) -> List[Dict[str, Any]]:
     headers = {"X-Api-Key": API_KEY}
-    async with session.get(f"{SONARR_API_URL}/qualityprofile", headers=headers) as response:
-        profiles = await response.json()
+    profiles = await fetch_with_retries(session, f"{SONARR_API_URL}/qualityprofile", headers=headers)
     return profiles
 
 # Get the profile ID for a given profile name.
@@ -119,15 +132,13 @@ def get_profile_id(profile_name: str, profiles: List[Dict[str, Any]]) -> int:
 # Fetch all shows from Sonarr.
 async def get_shows(session) -> List[Dict[str, Any]]:
     headers = {"X-Api-Key": API_KEY}
-    async with session.get(f"{SONARR_API_URL}/series", headers=headers) as response:
-        shows = await response.json()
+    shows = await fetch_with_retries(session, f"{SONARR_API_URL}/series", headers=headers)
     return shows
 
 # Fetch detailed series information from Sonarr.
 async def get_series(session, series_id: int) -> Dict[str, Any]:
     headers = {"X-Api-Key": API_KEY}
-    async with session.get(f"{SONARR_API_URL}/series/{series_id}", headers=headers) as response:
-        series = await response.json()
+    series = await fetch_with_retries(session, f"{SONARR_API_URL}/series/{series_id}", headers=headers)
     return series
 
 # Update the quality profile for a given series.
@@ -142,15 +153,13 @@ async def update_profile(session, series_id: int, profile_id: int) -> Dict[str, 
 # Fetch genres for a given series.
 async def get_genres(session, series_id: int) -> List[str]:
     headers = {"X-Api-Key": API_KEY}
-    async with session.get(f"{SONARR_API_URL}/series/{series_id}", headers=headers) as response:
-        series_data = await response.json()
+    series_data = await fetch_with_retries(session, f"{SONARR_API_URL}/series/{series_id}", headers=headers)
     return series_data.get("genres", [])
 
 # Fetch the total number of episodes for a given show.
 async def get_number_of_episodes(session, show_id: int) -> int:
     headers = {"X-Api-Key": API_KEY}
-    async with session.get(f"{SONARR_API_URL}/series/{show_id}", headers=headers) as response:
-        data = await response.json()
+    data = await fetch_with_retries(session, f"{SONARR_API_URL}/series/{show_id}", headers=headers)
     total_episodes = sum(season['statistics']['episodeCount'] for season in data['seasons'])
     return total_episodes
 
