@@ -36,26 +36,24 @@ SONARR_API_URL = f"{config.get('SONARR_IP')}/api/v3"
 TMDB_API_URL = "https://api.themoviedb.org/3"
 
 # Remove the year from the show title if present.
-def strip_year_from_title(title):
-    return re.sub(r"\s*\(\d{4}\)$", "", title).strip()
+def strip_year_from_title(title: str) -> tuple[str, int]:
+    match = re.search(r"\((\d{4})\)$", title)
+    if match:
+        year = int(match.group(1))
+        title_cleaned = re.sub(r"\s*\(\d{4}\)$", "", title).strip()
+        return title_cleaned, year
+    return title, None
 
 # Fetch the TMDB rating for a given show title, using cached data if available.
 def get_tmdb_rating(show_title: str) -> float:
-    show_title_cleaned = strip_year_from_title(show_title)
-    cache_file = os.path.join(CACHE_DIR, f"{show_title_cleaned}.json")
+    show_title_cleaned, year = strip_year_from_title(show_title)
+    cache_dir = os.path.join(CACHE_DIR, "tmdb_cache")
+    os.makedirs(cache_dir, exist_ok=True)
     
-    # Check if cached rating exists and is recent
-    if os.path.exists(cache_file):
-        with open(cache_file, "r") as f:
-            data = json.load(f)
-            if "timestamp" in data and "rating" in data:
-                timestamp = datetime.fromisoformat(data["timestamp"])
-                if datetime.now() - timestamp < timedelta(days=7):
-                    logging.info(f"Using cached rating for '{show_title_cleaned}'")
-                    return float(data["rating"])
-                
-    # Fetch rating from TMDB API
     params = {"api_key": TMDB_API_KEY, "query": show_title_cleaned}
+    if year:
+        params["first_air_date_year"] = year
+
     response = requests.get(f"{TMDB_API_URL}/search/tv", params=params)
     response.raise_for_status()
     data = response.json()
@@ -65,10 +63,30 @@ def get_tmdb_rating(show_title: str) -> float:
         return 0
     
     show_id = data["results"][0]["id"]
+    cache_file = os.path.join(cache_dir, f"{show_id}.json")
+
+    # Check if cached rating exists and is recent
+    if os.path.exists(cache_file):
+        with open(cache_file, "r") as f:
+            cached_data = json.load(f)
+            if "timestamp" in cached_data and "rating" in cached_data:
+                timestamp = datetime.fromisoformat(cached_data["timestamp"])
+                if datetime.now() - timestamp < timedelta(days=7):
+                    logging.info(f"Using cached rating for TMDB ID '{show_id}'")
+                    return float(cached_data["rating"])
+    
     response = requests.get(f"{TMDB_API_URL}/tv/{show_id}", params={"api_key": TMDB_API_KEY})
     response.raise_for_status()
-    data = response.json()
-    rating = data["vote_average"]
+    show_data = response.json()
+    rating = show_data["vote_average"]
+    
+    # Cache the rating
+    cache_data = {"rating": rating, "timestamp": datetime.now().isoformat()}
+    with open(cache_file, "w") as f:
+        json.dump(cache_data, f)
+    
+    return rating
+
     
     # Cache the rating
     cache_data = {"rating": rating, "timestamp": datetime.now().isoformat()}
