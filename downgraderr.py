@@ -49,7 +49,7 @@ def strip_year_from_title(title: str) -> tuple[str, int]:
 # Fetch the TMDB rating for a given show title, using cached data if available.
 async def get_tmdb_rating(session, show_title: str) -> float:
     show_title_cleaned, year = strip_year_from_title(show_title)
-    cache_dir = os.path.join(CACHE_DIR, "tmdb_cache")
+    cache_dir = os.path.join(CACHE_DIR)
     os.makedirs(cache_dir, exist_ok=True)
     
     params = {"api_key": TMDB_API_KEY, "query": show_title_cleaned}
