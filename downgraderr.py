@@ -127,12 +127,10 @@ def get_genres(series_id):
 def get_number_of_episodes(show_id):
     sonarr_url = f"{SONARR_IP}/api/v3/series/{show_id}"
     headers = {"X-Api-Key": API_KEY}
-
     response = requests.get(sonarr_url, headers=headers)
-    if response.status_code == 200:
-        data = response.json()
-        total_episodes = sum(season['statistics']['episodeCount'] for season in data['seasons'])
-        return total_episodes
+    data = response.json()
+    total_episodes = sum(season['statistics']['episodeCount'] for season in data['seasons'])
+    return total_episodes
 
 def main():
     # Fetch profiles and their IDs
@@ -182,7 +180,7 @@ def main():
               (any(genre in genres for genre in PROFILE_720p_GENRES) and not any(genre in genres for genre in PROFILE_4k_GENRES))):
             profile_id = profile_720p_id
         else:
-            profile_id = profile_720p_id  # Default to profile 2 if no other condition is met
+            profile_id = profile_720p_id  # Default to profile 720p if no other condition is met
 
         print(f"Updating show '{show_title}' (ID: {show['id']}) to profile ID {profile_id}")
         update_profile(show['id'], profile_id)
