@@ -48,7 +48,6 @@ RATING_THRESHOLD_1080P = config.get('RATING_THRESHOLD_1080P')
 RATING_THRESHOLD_4K = config.get('RATING_THRESHOLD_4K')
 PROFILE_4k_GENRES = set(config.get('PROFILE_4k_GENRES', []))  # Convert to set
 PROFILE_720p_GENRES = set(config.get('PROFILE_720p_GENRES', []))  # Convert to set
-CACHE_DIR = config.get('CACHE_DIR')
 EPISODE_THRESHOLD_1080P = config.get('EPISODE_THRESHOLD_1080P')
 EPISODE_THRESHOLD_4K = config.get('EPISODE_THRESHOLD_4K')
 PROFILE_1080P_GENRES = set(config.get('PROFILE_1080P_GENRES', []))  # Convert to set
@@ -56,6 +55,7 @@ YEAR_THRESHOLD_4K = config.get('YEAR_THRESHOLD_4K')  # Year threshold for 4K
 YEAR_THRESHOLD_1080P = config.get('YEAR_THRESHOLD_1080P')  # Year threshold for 1080p
 PLEX_URL = config.get('PLEX_URL')
 PLEX_TOKEN = config.get('PLEX_TOKEN')
+CACHE_DIR = config.get('CACHE_DIR')
 
 # Constants for API endpoints
 SONARR_API_URL = f"{config.get('SONARR_IP')}/api/v3"
@@ -185,43 +185,54 @@ async def get_last_airing_year(session, show_id: int) -> int:
         return last_airing_year
     return 0
 
-# Define a dictionary to store cached values
-days_since_last_watched_cache = {}
+CACHE_FILE = os.path.join(CACHE_DIR, "last_viewed.json")
+CACHE_EXPIRY = timedelta(days=1)
 
-# Fetch the number of days since the show was last watched from Plex.
-def get_days_since_last_watched(show_title: str) -> int:
-    if show_title in days_since_last_watched_cache:
-        return days_since_last_watched_cache[show_title]
+def load_last_viewed_from_cache():
+    if not os.path.exists(CACHE_FILE):
+        return None, None
     
-    try:
-        show = plex.library.section('TV Shows').get(show_title)
-        last_watched_dates = [episode.lastViewedAt for episode in show.episodes() if episode.lastViewedAt]
-        if not last_watched_dates:
-            days_since_last_watched_cache[show_title] = 99999  # Default high value if no episodes were watched
-            return 99999  
-        last_watched = max(last_watched_dates)
-        days_since_last_watched = (datetime.now() - last_watched).days
-        # Cache the result for 1 day
-        days_since_last_watched_cache[show_title] = days_since_last_watched
-        return days_since_last_watched
-    except Exception as e:
-        logging.warning(f"Could not retrieve last watched date for '{show_title}': {e}")
-        days_since_last_watched_cache[show_title] = 99999  # Default high value if the show is not found
-        return 99999  
+    with open(CACHE_FILE, "r") as file:
+        data = json.load(file)
+        last_viewed = data.get("last_viewed")
+        timestamp = data.get("timestamp")
+        return last_viewed, timestamp
 
-# Function to clear cache after 1 day
-def clear_cache():
-    global days_since_last_watched_cache
-    days_since_last_watched_cache = {}
+def save_last_viewed_to_cache(last_viewed, timestamp):
+    if not os.path.exists(CACHE_DIR):
+        os.makedirs(CACHE_DIR)
+    
+    data = {"last_viewed": last_viewed, "timestamp": timestamp}
+    with open(CACHE_FILE, "w") as file:
+        json.dump(data, file)
 
-# Schedule cache clearance every day
-scheduler = asyncio.get_event_loop()
-scheduler.call_later(86400, clear_cache)
+def is_cache_valid(timestamp):
+    if not timestamp:
+        return False
+    
+    now = datetime.now()
+    cache_time = datetime.fromtimestamp(timestamp)
+    return now - cache_time < CACHE_EXPIRY
+
+def get_last_viewed_from_cache_or_query_plex():
+    last_viewed, timestamp = load_last_viewed_from_cache()
+    if is_cache_valid(timestamp):
+        return last_viewed
+    else:
+        # Query Plex API to get last viewed date
+        # Update cache with the new last viewed date and timestamp
+        # Return the last viewed date obtained from the Plex API
+        pass
+
+# Example usage:
+last_viewed_date = get_last_viewed_from_cache_or_query_plex()
+print("Last viewed date:", last_viewed_date)
 
 def determine_profile_id(status: str, tmdb_rating: float, last_airing_date: datetime, genres: List[str], num_episodes: int, threshold_date: datetime, last_airing_year: int, days_since_last_watched: int, year_threshold_4k: int, year_threshold_1080p: int, profile_4k_id: int, profile_1080p_id: int, profile_720p_id: int) -> int:
     genres_set = set(genres)
 
-    if (status.lower() == 'ended' and 
+    if (days_since_last_watched is not None and 
+        status.lower() == 'ended' and 
         tmdb_rating >= RATING_THRESHOLD_4K and 
         last_airing_date > threshold_date and
         num_episodes < EPISODE_THRESHOLD_4K and
@@ -230,12 +241,13 @@ def determine_profile_id(status: str, tmdb_rating: float, last_airing_date: date
         PROFILE_4k_GENRES.intersection(genres_set)):
         return profile_4k_id
     
-    elif (status.lower() == 'continuing' and 
-        tmdb_rating >= RATING_THRESHOLD_4K and
-        num_episodes < EPISODE_THRESHOLD_4K and
-        last_airing_year >= YEAR_THRESHOLD_4K and
-        days_since_last_watched <= DOWNGRADE_DAYS_THRESHOLD and
-        PROFILE_4k_GENRES.intersection(genres_set)):
+    elif (days_since_last_watched is not None and 
+          status.lower() == 'continuing' and 
+          tmdb_rating >= RATING_THRESHOLD_4K and
+          num_episodes < EPISODE_THRESHOLD_4K and
+          last_airing_year >= YEAR_THRESHOLD_4K and
+          days_since_last_watched <= DOWNGRADE_DAYS_THRESHOLD and
+          PROFILE_4k_GENRES.intersection(genres_set)):
         return profile_4k_id
     
     elif (status.lower() == 'ended' and 
@@ -259,8 +271,9 @@ def determine_profile_id(status: str, tmdb_rating: float, last_airing_date: date
     
     else:
         return profile_1080p_id  # Default to profile 1080p if no other condition is met
+
     
-async def process_show(session, show, threshold_date, profile_ids, year_threshold_4k, year_threshold_1080p):
+async def process_show(session, show, threshold_date, profile_ids, year_threshold_4k, year_threshold_1080p, days_since_last_watched):
     last_airing = show.get("previousAiring")
     show_title = show['title']
     tmdb_rating = await get_tmdb_rating(session, show_title)
@@ -269,7 +282,6 @@ async def process_show(session, show, threshold_date, profile_ids, year_threshol
     show_id = show['id']
     num_episodes = await get_number_of_episodes(session, show_id)
     last_airing_year = await get_last_airing_year(session, show_id)
-    days_since_last_watched = get_days_since_last_watched(show_title)
     
     if last_airing:
         last_airing_date = datetime.strptime(last_airing, "%Y-%m-%dT%H:%M:%SZ")
@@ -291,8 +303,9 @@ async def main():
         
         shows = await get_shows(session)
         threshold_date = datetime.now() - timedelta(days=DOWNGRADE_DAYS_THRESHOLD)
+        last_viewed_date = get_last_viewed_from_cache_or_query_plex()
         
-        tasks = [process_show(session, show, threshold_date, profile_ids, YEAR_THRESHOLD_4K, YEAR_THRESHOLD_1080P) for show in shows]
+        tasks = [process_show(session, show, threshold_date, profile_ids, YEAR_THRESHOLD_4K, YEAR_THRESHOLD_1080P, last_viewed_date) for show in shows]
         await asyncio.gather(*tasks)
 
 if __name__ == "__main__":

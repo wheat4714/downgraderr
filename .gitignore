@@ -3,3 +3,5 @@ config.json
 config.json
 config_radarr.json
 config_radarr.json
+plex_cache/
+cache
