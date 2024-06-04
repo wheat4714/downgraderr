@@ -226,7 +226,7 @@ def determine_profile_id(status: str, tmdb_rating: float, last_airing_date: date
         last_airing_date > threshold_date and
         num_episodes < EPISODE_THRESHOLD_4K and
         last_airing_year >= YEAR_THRESHOLD_4K and
-        days_since_last_watched <= DOWNGRADE_DAYS_THRESHOLD and
+        days_since_last_watched >= DOWNGRADE_DAYS_THRESHOLD and
         PROFILE_4k_GENRES.intersection(genres_set)):
         return profile_4k_id
     
