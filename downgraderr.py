@@ -2,8 +2,8 @@ import subprocess
 
 # Define a dictionary with required packages and imported modules
 dependencies = {
-    'packages': ['requests', 'aiohttp', 'python-dateutil'],
-    'modules': ['json', 'os', 're', 'logging', 'asyncio', 'typing', 'aiohttp', 'datetime', 'dateutil.parser']
+    'packages': ['requests', 'aiohttp', 'python-dateutil', 'plexapi'],
+    'modules': ['json', 'os', 're', 'logging', 'asyncio', 'typing', 'datetime', 'dateutil.parser']
 }
 
 # Check and install required packages
@@ -23,6 +23,8 @@ for module in dependencies['modules']:
 from typing import List, Dict, Any, Tuple
 from datetime import datetime, timedelta
 from dateutil.parser import parse as parse_date
+import aiohttp  # Ensure aiohttp is imported here
+from plexapi.server import PlexServer
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -52,6 +54,8 @@ EPISODE_THRESHOLD_4K = config.get('EPISODE_THRESHOLD_4K')
 PROFILE_1080P_GENRES = set(config.get('PROFILE_1080P_GENRES', []))  # Convert to set
 YEAR_THRESHOLD_4K = config.get('YEAR_THRESHOLD_4K')  # Year threshold for 4K
 YEAR_THRESHOLD_1080P = config.get('YEAR_THRESHOLD_1080P')  # Year threshold for 1080p
+PLEX_URL = config.get('PLEX_URL')
+PLEX_TOKEN = config.get('PLEX_TOKEN')
 
 # Constants for API endpoints
 SONARR_API_URL = f"{config.get('SONARR_IP')}/api/v3"
@@ -60,6 +64,9 @@ TMDB_API_URL = "https://api.themoviedb.org/3"
 # Retry settings
 MAX_RETRIES = 3
 RETRY_DELAY = 2  # in seconds
+
+# Initialize Plex server connection
+plex = PlexServer(PLEX_URL, PLEX_TOKEN)
 
 # Remove the year from the show title if present, and return the year.
 def strip_year_from_title(title: str) -> Tuple[str, int]:
@@ -178,14 +185,30 @@ async def get_last_airing_year(session, show_id: int) -> int:
         return last_airing_year
     return 0
 
-def determine_profile_id(status: str, tmdb_rating: float, last_airing_date: datetime, genres: List[str], num_episodes: int, threshold_date: datetime, last_airing_year: int, year_threshold_4k: int, year_threshold_1080p: int, profile_4k_id: int, profile_1080p_id: int, profile_720p_id: int) -> int:
+# Fetch the number of days since the show was last watched from Plex.
+def get_days_since_last_watched(show_title: str) -> int:
+    try:
+        show = plex.library.section('TV Shows').get(show_title)
+        last_watched = max([episode.lastViewedAt for episode in show.episodes() if episode.lastViewedAt])
+        days_since_last_watched = (datetime.now() - last_watched).days
+        return days_since_last_watched
+    except Exception as e:
+        logging.warning(f"Could not retrieve last watched date for '{show_title}': {e}")
+        return None
+
+def determine_profile_id(status: str, tmdb_rating: float, last_airing_date: datetime, genres: List[str], num_episodes: int, threshold_date: datetime, last_airing_year: int, days_since_last_watched: int, year_threshold_4k: int, year_threshold_1080p: int, profile_4k_id: int, profile_1080p_id: int, profile_720p_id: int) -> int:
     genres_set = set(genres)
+
+    # Default days_since_last_watched to a high value if it's None
+    if days_since_last_watched is None:
+        days_since_last_watched = 99999
 
     if (status.lower() == 'ended' and 
         tmdb_rating >= RATING_THRESHOLD_4K and 
         last_airing_date > threshold_date and
         num_episodes < EPISODE_THRESHOLD_4K and
         last_airing_year >= YEAR_THRESHOLD_4K and
+        days_since_last_watched <= DOWNGRADE_DAYS_THRESHOLD and
         PROFILE_4k_GENRES.intersection(genres_set)):
         return profile_4k_id
     
@@ -193,6 +216,7 @@ def determine_profile_id(status: str, tmdb_rating: float, last_airing_date: date
         tmdb_rating >= RATING_THRESHOLD_4K and
         num_episodes < EPISODE_THRESHOLD_4K and
         last_airing_year >= YEAR_THRESHOLD_4K and
+        days_since_last_watched <= DOWNGRADE_DAYS_THRESHOLD and
         PROFILE_4k_GENRES.intersection(genres_set)):
         return profile_4k_id
     
@@ -227,13 +251,14 @@ async def process_show(session, show, threshold_date, profile_ids, year_threshol
     show_id = show['id']
     num_episodes = await get_number_of_episodes(session, show_id)
     last_airing_year = await get_last_airing_year(session, show_id)
+    days_since_last_watched = get_days_since_last_watched(show_title)
     
     if last_airing:
         last_airing_date = datetime.strptime(last_airing, "%Y-%m-%dT%H:%M:%SZ")
     else:
         last_airing_date = datetime.min
 
-    profile_id = determine_profile_id(status, tmdb_rating, last_airing_date, genres, num_episodes, threshold_date, last_airing_year, year_threshold_4k, year_threshold_1080p, *profile_ids)
+    profile_id = determine_profile_id(status, tmdb_rating, last_airing_date, genres, num_episodes, threshold_date, last_airing_year, days_since_last_watched, year_threshold_4k, year_threshold_1080p, *profile_ids)
     logging.info(f"Updating show '{show_title}' (ID: {show['id']}) to profile ID {profile_id}")
     await update_profile(session, show['id'], profile_id)  
 
