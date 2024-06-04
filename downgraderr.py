@@ -189,19 +189,18 @@ async def get_last_airing_year(session, show_id: int) -> int:
 def get_days_since_last_watched(show_title: str) -> int:
     try:
         show = plex.library.section('TV Shows').get(show_title)
-        last_watched = max([episode.lastViewedAt for episode in show.episodes() if episode.lastViewedAt])
+        last_watched_dates = [episode.lastViewedAt for episode in show.episodes() if episode.lastViewedAt]
+        if not last_watched_dates:
+            return 99999  # Default high value if no episodes were watched
+        last_watched = max(last_watched_dates)
         days_since_last_watched = (datetime.now() - last_watched).days
         return days_since_last_watched
     except Exception as e:
         logging.warning(f"Could not retrieve last watched date for '{show_title}': {e}")
-        return None
+        return 99999  # Default high value if the show is not found
 
 def determine_profile_id(status: str, tmdb_rating: float, last_airing_date: datetime, genres: List[str], num_episodes: int, threshold_date: datetime, last_airing_year: int, days_since_last_watched: int, year_threshold_4k: int, year_threshold_1080p: int, profile_4k_id: int, profile_1080p_id: int, profile_720p_id: int) -> int:
     genres_set = set(genres)
-
-    # Default days_since_last_watched to a high value if it's None
-    if days_since_last_watched is None:
-        days_since_last_watched = 99999
 
     if (status.lower() == 'ended' and 
         tmdb_rating >= RATING_THRESHOLD_4K and 
