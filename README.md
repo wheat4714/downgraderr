@@ -1,9 +1,11 @@
 # downgraderr
 
 **Disclaimer**
+
 This project is under heavy development. Use it at your own risk.
 
 **Introduction**
+
 This project is a collection of scripts designed to assign quality profiles to sonarr/radarr based on set criteria. The scripts support many different conditions, all of which are user-configurable.
 
 **Problems solved**
