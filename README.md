@@ -13,6 +13,11 @@ This project is a collection of scripts designed to assign quality profiles to s
 - Action/Sci-Fi is grabbed at the highest quality setting to ensure it gets the quality it deserves
 - Once a show is no longer needed in 4K because it's finished, it automatically downgrades to 1080P to save space.
 
+**Installation instructions**
+1. Rename template_radarr_config.json to config_radarr.json and template_sonarr_config.json to config.json.
+2. Add your Radarr and Sonarr URLs, API keys, and TMDB API key to the config files
+3. Configure your conditions and run the script
+
 **To do**
 - Lidarr script
 - Plex conditions
