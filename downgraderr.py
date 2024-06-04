@@ -185,19 +185,38 @@ async def get_last_airing_year(session, show_id: int) -> int:
         return last_airing_year
     return 0
 
+# Define a dictionary to store cached values
+days_since_last_watched_cache = {}
+
 # Fetch the number of days since the show was last watched from Plex.
 def get_days_since_last_watched(show_title: str) -> int:
+    if show_title in days_since_last_watched_cache:
+        return days_since_last_watched_cache[show_title]
+    
     try:
         show = plex.library.section('TV Shows').get(show_title)
         last_watched_dates = [episode.lastViewedAt for episode in show.episodes() if episode.lastViewedAt]
         if not last_watched_dates:
-            return 99999  # Default high value if no episodes were watched
+            days_since_last_watched_cache[show_title] = 99999  # Default high value if no episodes were watched
+            return 99999  
         last_watched = max(last_watched_dates)
         days_since_last_watched = (datetime.now() - last_watched).days
+        # Cache the result for 1 day
+        days_since_last_watched_cache[show_title] = days_since_last_watched
         return days_since_last_watched
     except Exception as e:
         logging.warning(f"Could not retrieve last watched date for '{show_title}': {e}")
-        return 99999  # Default high value if the show is not found
+        days_since_last_watched_cache[show_title] = 99999  # Default high value if the show is not found
+        return 99999  
+
+# Function to clear cache after 1 day
+def clear_cache():
+    global days_since_last_watched_cache
+    days_since_last_watched_cache = {}
+
+# Schedule cache clearance every day
+scheduler = asyncio.get_event_loop()
+scheduler.call_later(86400, clear_cache)
 
 def determine_profile_id(status: str, tmdb_rating: float, last_airing_date: datetime, genres: List[str], num_episodes: int, threshold_date: datetime, last_airing_year: int, days_since_last_watched: int, year_threshold_4k: int, year_threshold_1080p: int, profile_4k_id: int, profile_1080p_id: int, profile_720p_id: int) -> int:
     genres_set = set(genres)
