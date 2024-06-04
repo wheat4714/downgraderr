@@ -15,5 +15,6 @@ This project is a collection of scripts designed to assign quality profiles to s
 
 **To do**
 - Lidarr script
+- Plex conditions
 - Package as Docker container to run as a node
 - Write instructions to integrate using native radarr/sonarr scripting support
