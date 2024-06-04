@@ -2,8 +2,8 @@ import subprocess
 
 # Define a dictionary with required packages and imported modules
 dependencies = {
-    'packages': ['requests', 'aiohttp'],
-    'modules': ['json', 'os', 're', 'logging', 'asyncio', 'typing', 'aiohttp', 'datetime']
+    'packages': ['requests', 'aiohttp', 'python-dateutil'],
+    'modules': ['json', 'os', 're', 'logging', 'asyncio', 'typing', 'aiohttp', 'datetime', 'dateutil.parser']
 }
 
 # Check and install required packages
@@ -20,8 +20,9 @@ for module in dependencies['modules']:
     globals()[module] = __import__(module)
 
 # Import specific items from modules
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 from datetime import datetime, timedelta
+from dateutil.parser import parse as parse_date
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -46,8 +47,8 @@ RATING_THRESHOLD_4K = config.get('RATING_THRESHOLD_4K')
 PROFILE_4k_GENRES = set(config.get('PROFILE_4k_GENRES', []))  # Convert to set
 PROFILE_720p_GENRES = set(config.get('PROFILE_720p_GENRES', []))  # Convert to set
 CACHE_DIR = config.get('CACHE_DIR')
-EPISODE_THRESHOLD_1080P = config.get ('EPISODE_THRESHOLD_1080P')
-EPISODE_THRESHOLD_4K = config.get ('EPISODE_THRESHOLD_4K')
+EPISODE_THRESHOLD_1080P = config.get('EPISODE_THRESHOLD_1080P')
+EPISODE_THRESHOLD_4K = config.get('EPISODE_THRESHOLD_4K')
 PROFILE_1080P_GENRES = set(config.get('PROFILE_1080P_GENRES', []))  # Convert to set
 YEAR_THRESHOLD_4K = config.get('YEAR_THRESHOLD_4K')  # Year threshold for 4K
 YEAR_THRESHOLD_1080P = config.get('YEAR_THRESHOLD_1080P')  # Year threshold for 1080p
@@ -60,8 +61,8 @@ TMDB_API_URL = "https://api.themoviedb.org/3"
 MAX_RETRIES = 3
 RETRY_DELAY = 2  # in seconds
 
-# Remove the year from the show title if present.
-def strip_year_from_title(title: str) -> tuple[str, int]:
+# Remove the year from the show title if present, and return the year.
+def strip_year_from_title(title: str) -> Tuple[str, int]:
     match = re.search(r"\((\d{4})\)$", title)
     if match:
         year = int(match.group(1))
@@ -76,7 +77,7 @@ async def fetch_with_retries(session, url, params=None, headers=None):
             async with session.get(url, params=params, headers=headers) as response:
                 response.raise_for_status()
                 return await response.json()
-        except (aiohttp.ClientError, aiohttp.ClientConnectionError) as e:
+        except (aiohttp.ClientError, aiohttp.ClientConnectionError, aiohttp.ClientPayloadError) as e:
             logging.warning(f"Request failed ({e}), retrying in {RETRY_DELAY} seconds...")
             await asyncio.sleep(RETRY_DELAY)
     raise Exception(f"Failed to fetch data from {url} after {MAX_RETRIES} retries.")
@@ -84,7 +85,7 @@ async def fetch_with_retries(session, url, params=None, headers=None):
 # Fetch the TMDB rating for a given show title, using cached data if available.
 async def get_tmdb_rating(session, show_title: str) -> float:
     show_title_cleaned, year = strip_year_from_title(show_title)
-    cache_dir = os.path.join(CACHE_DIR)
+    cache_dir = os.path.join(CACHE_DIR, "tmdb_cache")
     os.makedirs(cache_dir, exist_ok=True)
     
     params = {"api_key": TMDB_API_KEY, "query": show_title_cleaned}
@@ -164,7 +165,7 @@ async def get_genres(session, series_id: int) -> List[str]:
 async def get_number_of_episodes(session, show_id: int) -> int:
     headers = {"X-Api-Key": API_KEY}
     data = await fetch_with_retries(session, f"{SONARR_API_URL}/series/{show_id}", headers=headers)
-    total_episodes = sum(season['statistics']['episodeCount'] for season in data['seasons'])
+    total_episodes = sum(season['statistics']['episodeCount'] for season in data['seasons'] if 'statistics' in season)
     return total_episodes
 
 # Fetch the last airing year for a given show.

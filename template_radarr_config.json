@@ -1,0 +1,17 @@
+{
+    "RADARR_IP": "YOUR RADARR URL",
+    "API_KEY": "YOUR RADARR API KEY",
+    "TMDB_API_KEY": "YOUR TMDB API KEY",
+    "PROFILE_4k_NAME": "4k",
+    "PROFILE_720p_NAME": "720p",
+    "PROFILE_1080p_NAME": "1080p",
+    "DOWNGRADE_DAYS_THRESHOLD": 365,
+    "RATING_THRESHOLD_1080P": 5.0,
+    "RATING_THRESHOLD_4K": 7.0,
+    "PROFILE_4k_GENRES": ["Action", "Science Fiction"],
+    "PROFILE_720p_GENRES": [],
+    "PROFILE_1080P_GENRES": ["Thriller", "Documentary", "Drama", "Animation", "Adventure"],
+    "CACHE_DIR": "ratings_cache",
+    "YEAR_THRESHOLD_4K": 2010,
+    "YEAR_THRESHOLD_1080P": 2000
+}
