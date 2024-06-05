@@ -1,6 +1,3 @@
-    Make the profiles into a list
-    Rewrite all the elseifs to use switches instead, to improve scaling and flexibility with a configurable number of profiles# downgraderr
-
 **Disclaimer**
 
 This project is under heavy development. Use it at your own risk.
