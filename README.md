@@ -1,4 +1,5 @@
-# downgraderr
+    Make the profiles into a list
+    Rewrite all the elseifs to use switches instead, to improve scaling and flexibility with a configurable number of profiles# downgraderr
 
 **Disclaimer**
 
@@ -23,4 +24,6 @@ This project is a collection of scripts designed to assign quality profiles to s
 - Plex conditions
 - Package as Docker container to run as a node
 - Write instructions to integrate using native radarr/sonarr scripting support
+- Make the profiles into a list instead of hardcoded profile1,2,3
+- Rewrite all the elseifs to use switches instead, to improve scaling and flexibility with a configurable number of profiles
 
