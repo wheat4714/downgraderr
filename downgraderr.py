@@ -180,43 +180,46 @@ async def get_last_airing_year(session, show_id: int) -> int:
 
 def determine_profile_id(status: str, tmdb_rating: float, last_airing_date: datetime, genres: List[str], num_episodes: int, threshold_date: datetime, last_airing_year: int, year_threshold_4k: int, year_threshold_1080p: int, profile_4k_id: int, profile_1080p_id: int, profile_720p_id: int) -> int:
     genres_set = set(genres)
+    status_lower = status.lower()
 
-    if (status.lower() == 'ended' and 
-        tmdb_rating >= RATING_THRESHOLD_4K and 
-        last_airing_date > threshold_date and
-        num_episodes < EPISODE_THRESHOLD_4K and
-        last_airing_year >= YEAR_THRESHOLD_4K and
-        PROFILE_4k_GENRES.intersection(genres_set)):
-        return profile_4k_id
-    
-    elif (status.lower() == 'continuing' and 
-        tmdb_rating >= RATING_THRESHOLD_4K and
-        num_episodes < EPISODE_THRESHOLD_4K and
-        last_airing_year >= YEAR_THRESHOLD_4K and
-        PROFILE_4k_GENRES.intersection(genres_set)):
-        return profile_4k_id
-    
-    elif (status.lower() == 'ended' and 
-          num_episodes < EPISODE_THRESHOLD_1080P and 
-          last_airing_year >= YEAR_THRESHOLD_1080P and                   
-          (PROFILE_1080P_GENRES.intersection(genres_set) or PROFILE_4k_GENRES.intersection(genres_set))):
-        return profile_1080p_id
-    
-    elif (status.lower() == 'continuing' and 
-          tmdb_rating >= RATING_THRESHOLD_1080P and
-          num_episodes < EPISODE_THRESHOLD_1080P and
-          last_airing_year >= YEAR_THRESHOLD_1080P and          
-          (PROFILE_1080P_GENRES.intersection(genres_set) or PROFILE_4k_GENRES.intersection(genres_set))):
-        return profile_1080p_id        
-
-    elif (tmdb_rating <= RATING_THRESHOLD_1080P or
-          num_episodes > EPISODE_THRESHOLD_1080P or
-          last_airing_year < YEAR_THRESHOLD_1080P or
-          PROFILE_720p_GENRES.intersection(genres_set)):     
-        return profile_720p_id
-    
-    else:
-        return profile_1080p_id  # Default to profile 1080p if no other condition is met
+    match status_lower, tmdb_rating, last_airing_date, num_episodes, last_airing_year, genres_set:
+        case 'ended', rating, date, episodes, year, genres if (
+            rating >= RATING_THRESHOLD_4K and
+            date > threshold_date and
+            episodes < EPISODE_THRESHOLD_4K and
+            year >= YEAR_THRESHOLD_4K and
+            PROFILE_4k_GENRES.intersection(genres)
+        ):
+            return profile_4k_id
+        case 'continuing', rating, _, episodes, year, genres if (
+            rating >= RATING_THRESHOLD_4K and
+            episodes < EPISODE_THRESHOLD_4K and
+            year >= YEAR_THRESHOLD_4K and
+            PROFILE_4k_GENRES.intersection(genres)
+        ):
+            return profile_4k_id
+        case 'ended', _, _, episodes, year, genres if (
+            episodes < EPISODE_THRESHOLD_1080P and
+            year >= YEAR_THRESHOLD_1080P and
+            (PROFILE_1080P_GENRES.intersection(genres) or PROFILE_4k_GENRES.intersection(genres))
+        ):
+            return profile_1080p_id
+        case 'continuing', rating, _, episodes, year, genres if (
+            rating >= RATING_THRESHOLD_1080P and
+            episodes < EPISODE_THRESHOLD_1080P and
+            year >= YEAR_THRESHOLD_1080P and
+            (PROFILE_1080P_GENRES.intersection(genres) or PROFILE_4k_GENRES.intersection(genres))
+        ):
+            return profile_1080p_id
+        case _, rating, _, episodes, year, genres if (
+            rating <= RATING_THRESHOLD_1080P or
+            episodes > EPISODE_THRESHOLD_1080P or
+            year < YEAR_THRESHOLD_1080P or
+            PROFILE_720p_GENRES.intersection(genres)
+        ):
+            return profile_720p_id
+        case _:
+            return profile_1080p_id
     
 async def process_show(session, show, threshold_date, profile_ids, year_threshold_4k, year_threshold_1080p):
     last_airing = show.get("previousAiring")
