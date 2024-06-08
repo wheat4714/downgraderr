@@ -2,22 +2,58 @@
     "SONARR_IP": "YOUR SONARR URL",
     "API_KEY": "YOUR SONARR API KEY",
     "TMDB_API_KEY": "YOUR TMDB API KEY",
+    "PLEX_URL": "YOUR PLEX URL",
+    "PLEX_TOKEN": "YOUR PLEX TOKEN",
     "CACHE_DIR": "ratings_cache",
-
-    "PROFILE_4k_NAME": "4k",
-    "PROFILE_4k_GENRES": ["Action", "Science Fiction"],
+  
+    "PROFILE_4K_NAME": "4k",
+    "PROFILE_4K_GENRES": ["Action", "Science Fiction"],
     "EPISODE_THRESHOLD_4K": 100,
     "RATING_THRESHOLD_4K": 8.0,
     "YEAR_THRESHOLD_4K": 2015,
     "DOWNGRADE_DAYS_THRESHOLD": 30,
-
+  
     "PROFILE_1080p_NAME": "1080p",
-    "PROFILE_1080P_GENRES": ["Thriller", "Documentary", "Drama", "Animation", "Adventure"],
+    "PROFILE_1080P_GENRES": [
+      "Thriller",
+      "Documentary",
+      "Drama",
+      "Animation",
+      "Adventure"
+    ],
     "EPISODE_THRESHOLD_1080P": 200,
     "RATING_THRESHOLD_1080P": 7.0,
     "YEAR_THRESHOLD_1080P": 2005,
-
+  
     "PROFILE_720p_NAME": "720p",
-    "PROFILE_720p_GENRES": ["Comedy", "Reality", "Family"]
-
-}
+    "PROFILE_720P_GENRES": ["Comedy", "Reality", "Family"],
+    "RATING_THRESHOLD_720P": 0.1,
+    "EPISODE_THRESHOLD_720P": 20000,
+    "YEAR_THRESHOLD_720P": 1800,
+  
+    "CONDITIONS": {
+      "4k": {
+        "USE_RATING": true,
+        "USE_EPISODES": true,
+        "USE_YEAR": true,
+        "USE_GENRES": true,
+        "USE_CONTINUING": true
+      },
+      "1080p": {
+        "USE_RATING": true,
+        "USE_EPISODES": true,
+        "USE_YEAR": true,
+        "USE_GENRES": true,
+        "USE_CONTINUING": false
+      },
+      "720p": {
+        "USE_RATING": false,
+        "USE_EPISODES": false,
+        "USE_YEAR": false,
+        "USE_GENRES": true,
+        "USE_CONTINUING": false
+      }
+    }
+  }
+  
+  

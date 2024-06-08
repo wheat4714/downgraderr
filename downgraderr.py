@@ -3,7 +3,7 @@ import subprocess
 # Define a dictionary with required packages and imported modules
 dependencies = {
     'packages': ['requests', 'aiohttp', 'python-dateutil'],
-    'modules': ['json', 'os', 're', 'logging', 'asyncio', 'typing', 'aiohttp', 'datetime', 'dateutil.parser']
+    'modules': ['json', 'os', 're', 'logging', 'asyncio', 'typing', 'aiohttp', 'sqlite3', 'datetime', 'dateutil.parser']
 }
 
 # Check and install required packages
@@ -27,7 +27,7 @@ from dateutil.parser import parse as parse_date
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def read_config(filename):
+def read_config(filename: str) -> Dict[str, Any]:
     with open(filename, 'r') as file:
         return json.load(file)
 
@@ -38,20 +38,32 @@ config = read_config('config.json')
 SONARR_IP = config.get('SONARR_IP')
 API_KEY = config.get('API_KEY')
 TMDB_API_KEY = config.get('TMDB_API_KEY')
-PROFILE_4k_NAME = config.get('PROFILE_4k_NAME')
+PROFILE_4K_NAME = config.get('PROFILE_4K_NAME')
 PROFILE_720p_NAME = config.get('PROFILE_720p_NAME')
 PROFILE_1080p_NAME = config.get('PROFILE_1080p_NAME')
 DOWNGRADE_DAYS_THRESHOLD = config.get('DOWNGRADE_DAYS_THRESHOLD')
 RATING_THRESHOLD_1080P = config.get('RATING_THRESHOLD_1080P')
 RATING_THRESHOLD_4K = config.get('RATING_THRESHOLD_4K')
-PROFILE_4k_GENRES = set(config.get('PROFILE_4k_GENRES', []))  # Convert to set
-PROFILE_720p_GENRES = set(config.get('PROFILE_720p_GENRES', []))  # Convert to set
+PROFILE_4K_GENRES = set(config.get('PROFILE_4K_GENRES', []))  # Convert to set
+PROFILE_720P_GENRES = set(config.get('PROFILE_720P_GENRES', []))  # Convert to set
 CACHE_DIR = config.get('CACHE_DIR')
 EPISODE_THRESHOLD_1080P = config.get('EPISODE_THRESHOLD_1080P')
+EPISODE_THRESHOLD_720P = config.get('EPISODE_THRESHOLD_720P')
 EPISODE_THRESHOLD_4K = config.get('EPISODE_THRESHOLD_4K')
 PROFILE_1080P_GENRES = set(config.get('PROFILE_1080P_GENRES', []))  # Convert to set
 YEAR_THRESHOLD_4K = config.get('YEAR_THRESHOLD_4K')  # Year threshold for 4K
 YEAR_THRESHOLD_1080P = config.get('YEAR_THRESHOLD_1080P')  # Year threshold for 1080p
+YEAR_THRESHOLD_720P = config.get('YEAR_THRESHOLD_720P')  # Year threshold for 720p
+CONDITIONS = config.get('CONDITIONS', {})
+
+print(f"RATING_THRESHOLD_4K: {RATING_THRESHOLD_4K}")
+print(f"RATING_THRESHOLD_1080P: {RATING_THRESHOLD_1080P}")
+print(f"EPISODE_THRESHOLD_4K: {EPISODE_THRESHOLD_4K}")
+print(f"EPISODE_THRESHOLD_1080P: {EPISODE_THRESHOLD_1080P}")
+print(f"PROFILE_4K_GENRES: {PROFILE_4K_GENRES}")
+print(f"PROFILE_720P_GENRES: {PROFILE_720P_GENRES}")
+print(f"PROFILE_1080P_GENRES: {PROFILE_1080P_GENRES}")
+
 
 # Constants for API endpoints
 SONARR_API_URL = f"{config.get('SONARR_IP')}/api/v3"
@@ -70,6 +82,14 @@ def strip_year_from_title(title: str) -> Tuple[str, int]:
         return title_cleaned, year
     return title, None
 
+# Create or connect to the database
+conn = sqlite3.connect('ratings.db')
+c = conn.cursor()
+
+# Create the table if it doesn't exist
+c.execute('''CREATE TABLE IF NOT EXISTS ratings
+             (id INTEGER PRIMARY KEY, tmdb_id INTEGER, rating REAL, timestamp TEXT)''')
+
 # Helper function to make HTTP requests with retries
 async def fetch_with_retries(session, url, params=None, headers=None):
     for attempt in range(MAX_RETRIES):
@@ -84,40 +104,38 @@ async def fetch_with_retries(session, url, params=None, headers=None):
 
 # Fetch the TMDB rating for a given show title, using cached data if available.
 async def get_tmdb_rating(session, show_title: str) -> float:
-    show_title_cleaned, year = strip_year_from_title(show_title)
-    cache_dir = os.path.join(CACHE_DIR, "tmdb_cache")
-    os.makedirs(cache_dir, exist_ok=True)
+    show_title_without_year, year = strip_year_from_title(show_title)
     
-    params = {"api_key": TMDB_API_KEY, "query": show_title_cleaned}
+    params = {"api_key": TMDB_API_KEY, "query": show_title_without_year}
     if year:
         params["first_air_date_year"] = year
 
-    data = await fetch_with_retries(session, f"{TMDB_API_URL}/search/tv", params=params)
+    show_details = await fetch_with_retries(session, f"{TMDB_API_URL}/search/tv", params=params)
 
-    if data["total_results"] == 0:
-        logging.warning(f"No results found for '{show_title_cleaned}' on TMDb.")
+    if show_details["total_results"] == 0:
+        logging.warning(f"No results found for '{show_title_without_year}' on TMDb.")
         return 0
     
-    show_id = data["results"][0]["id"]
-    cache_file = os.path.join(cache_dir, f"{show_id}.json")
+    show_id = show_details["results"][0]["id"]
 
     # Check if cached rating exists and is recent
-    if os.path.exists(cache_file):
-        with open(cache_file, "r") as f:
-            cached_data = json.load(f)
-            if "timestamp" in cached_data and "rating" in cached_data:
-                timestamp = datetime.fromisoformat(cached_data["timestamp"])
-                if datetime.now() - timestamp < timedelta(days=7):
-                    logging.info(f"Using cached rating for TMDB ID '{show_id}'")
-                    return float(cached_data["rating"])
+    c.execute("SELECT rating, timestamp FROM ratings WHERE tmdb_id = ?", (show_id,))
+    cached_data = c.fetchone()
+    if cached_data:
+        rating, timestamp_str = cached_data
+        timestamp = datetime.fromisoformat(timestamp_str)
+        if datetime.now() - timestamp < timedelta(days=7):
+            logging.info(f"Using cached rating for TMDB ID '{show_id}'")
+            return rating
     
+    # Fetch rating from TMDB API
     show_data = await fetch_with_retries(session, f"{TMDB_API_URL}/tv/{show_id}", params={"api_key": TMDB_API_KEY})
     rating = show_data["vote_average"]
     
     # Cache the rating
-    cache_data = {"rating": rating, "timestamp": datetime.now().isoformat()}
-    with open(cache_file, "w") as f:
-        json.dump(cache_data, f)
+    timestamp_str = datetime.now().isoformat()
+    c.execute("INSERT OR REPLACE INTO ratings (tmdb_id, rating, timestamp) VALUES (?, ?, ?)", (show_id, rating, timestamp_str))
+    conn.commit()
     
     return rating
 
@@ -146,14 +164,31 @@ async def get_series(session, series_id: int) -> Dict[str, Any]:
     series = await fetch_with_retries(session, f"{SONARR_API_URL}/series/{series_id}", headers=headers)
     return series
 
-# Update the quality profile for a given series.
-async def update_profile(session, series_id: int, profile_id: int) -> Dict[str, Any]:
+# Create the table for logging profile changes if it doesn't exist
+c.execute('''CREATE TABLE IF NOT EXISTS profile_changes
+             (id INTEGER PRIMARY KEY, series_id INTEGER, old_profile_id INTEGER, new_profile_id INTEGER, timestamp TEXT)''')
+
+# Update the quality profile for a given series and log the change if applicable
+async def update_profile(session, series_id: int, new_profile_id: int) -> Dict[str, Any]:
     series_data = await get_series(session, series_id)
-    series_data['qualityProfileId'] = profile_id
-    headers = {"X-Api-Key": API_KEY}
-    async with session.put(f"{SONARR_API_URL}/series/{series_id}", headers=headers, json=series_data) as response:
-        updated_series = await response.json()
-    return updated_series
+    old_profile_id = series_data['qualityProfileId']
+
+    if old_profile_id != new_profile_id:
+        series_data['qualityProfileId'] = new_profile_id
+        headers = {"X-Api-Key": API_KEY}
+        async with session.put(f"{SONARR_API_URL}/series/{series_id}", headers=headers, json=series_data) as response:
+            updated_series = await response.json()
+
+        # Log the profile change
+        timestamp_str = datetime.now().isoformat()
+        c.execute("INSERT INTO profile_changes (series_id, old_profile_id, new_profile_id, timestamp) VALUES (?, ?, ?, ?)",
+                  (series_id, old_profile_id, new_profile_id, timestamp_str))
+        conn.commit()
+        logging.info(f"Logged profile change for series {series_id}: {old_profile_id} -> {new_profile_id}")
+    else:
+        logging.info(f"No profile change needed for series {series_id}")
+
+    return series_data
 
 # Fetch genres for a given series.
 async def get_genres(session, series_id: int) -> List[str]:
@@ -162,61 +197,101 @@ async def get_genres(session, series_id: int) -> List[str]:
     return series_data.get("genres", [])
 
 # Fetch the total number of episodes for a given show.
-async def get_number_of_episodes(session, show_id: int) -> int:
+async def get_total_episode_count(session, show_id: int) -> int:
     headers = {"X-Api-Key": API_KEY}
-    data = await fetch_with_retries(session, f"{SONARR_API_URL}/series/{show_id}", headers=headers)
-    total_episodes = sum(season['statistics']['episodeCount'] for season in data['seasons'] if 'statistics' in season)
+    show_details = await fetch_with_retries(session, f"{SONARR_API_URL}/series/{show_id}", headers=headers)
+    total_episodes = sum(season['statistics']['episodeCount'] for season in show_details['seasons'] if 'statistics' in season)
     return total_episodes
 
 # Fetch the last airing year for a given show.
-async def get_last_airing_year(session, show_id: int) -> int:
+async def get_year_of_last_airing(session, show_id: int) -> int:
     headers = {"X-Api-Key": API_KEY}
-    data = await fetch_with_retries(session, f"{SONARR_API_URL}/series/{show_id}", headers=headers)
-    last_airing = data.get("previousAiring")
+    show_details = await fetch_with_retries(session, f"{SONARR_API_URL}/series/{show_id}", headers=headers)
+    last_airing = show_details.get("previousAiring")
     if last_airing:
         last_airing_year = datetime.strptime(last_airing, "%Y-%m-%dT%H:%M:%SZ").year
         return last_airing_year
     return 0
 
-def determine_profile_id(status: str, tmdb_rating: float, last_airing_date: datetime, genres: List[str], num_episodes: int, threshold_date: datetime, last_airing_year: int, year_threshold_4k: int, year_threshold_1080p: int, profile_4k_id: int, profile_1080p_id: int, profile_720p_id: int) -> int:
+def determine_profile_id(status: str, tmdb_rating: float, last_airing_date: datetime, genres: List[str], num_episodes: int, threshold_date: datetime, last_airing_year: int, profile_4k_id: int, profile_1080p_id: int, profile_720p_id: int) -> int:
     genres_set = set(genres)
+    status_lower = status.lower()
 
-    if (status.lower() == 'ended' and 
-        tmdb_rating >= RATING_THRESHOLD_4K and 
-        last_airing_date > threshold_date and
-        num_episodes < EPISODE_THRESHOLD_4K and
-        last_airing_year >= YEAR_THRESHOLD_4K and
-        PROFILE_4k_GENRES.intersection(genres_set)):
-        return profile_4k_id
-    
-    elif (status.lower() == 'continuing' and 
-        tmdb_rating >= RATING_THRESHOLD_4K and
-        num_episodes < EPISODE_THRESHOLD_4K and
-        last_airing_year >= YEAR_THRESHOLD_4K and
-        PROFILE_4k_GENRES.intersection(genres_set)):
-        return profile_4k_id
-    
-    elif (status.lower() == 'ended' and 
-          num_episodes < EPISODE_THRESHOLD_1080P and 
-          last_airing_year >= YEAR_THRESHOLD_1080P and                   
-          (PROFILE_1080P_GENRES.intersection(genres_set) or PROFILE_4k_GENRES.intersection(genres_set))):
-        return profile_1080p_id
-    
-    elif (status.lower() == 'continuing' and 
-          tmdb_rating >= RATING_THRESHOLD_1080P and
-          num_episodes < EPISODE_THRESHOLD_1080P and
-          last_airing_year >= YEAR_THRESHOLD_1080P and          
-          (PROFILE_1080P_GENRES.intersection(genres_set) or PROFILE_4k_GENRES.intersection(genres_set))):
-        return profile_1080p_id        
+    match status_lower, tmdb_rating, last_airing_date, num_episodes, last_airing_year, genres_set:
+        case 'ended', rating, date, episodes, year, genres if (condition := build_condition('4k', tmdb_rating)) and eval(condition):
+            logging.info(f"Assigning 4K profile for show with status '{status}', rating {rating}, last airing date {date}, {episodes} episodes, last airing year {year}, and genres {genres}")
+            logging.info(f"Condition evaluated: {condition}")
+            return profile_4k_id
+        case 'continuing', rating, _, episodes, year, genres if (condition := build_condition('4k', tmdb_rating)) and eval(condition):
+            logging.info(f"Assigning 4K profile for show with status '{status}', rating {rating}, {episodes} episodes, last airing year {year}, and genres {genres}")
+            logging.info(f"Condition evaluated: {condition}")
+            return profile_4k_id
+        case 'ended', _, _, episodes, year, genres if (condition := build_condition('1080p', tmdb_rating)) and eval(condition):
+            logging.info(f"Assigning 1080p profile for show with status '{status}', {episodes} episodes, last airing year {year}, and genres {genres}")
+            logging.info(f"Condition evaluated: {condition}")
+            return profile_1080p_id
+        case 'continuing', rating, _, episodes, year, genres if (condition := build_condition('1080p', tmdb_rating)) and eval(condition):
+            logging.info(f"Assigning 1080p profile for show with status '{status}', rating {rating}, {episodes} episodes, last airing year {year}, and genres {genres}")
+            logging.info(f"Condition evaluated: {condition}")
+            return profile_1080p_id
+        case _, rating, _, episodes, year, genres if (condition := build_condition('720p', tmdb_rating)) and eval(condition):
+            logging.info(f"Assigning 720p profile for show with rating {rating}, {episodes} episodes, last airing year {year}, and genres {genres}")
+            logging.info(f"Condition evaluated: {condition}")
+            return profile_720p_id
+        case _:
+            logging.info(f"Assigning default 1080p profile for show with status '{status}', rating {tmdb_rating}, last airing date {last_airing_date}, {num_episodes} episodes, last airing year {last_airing_year}, and genres {genres}")
+            return profile_1080p_id
 
-    elif (tmdb_rating <= RATING_THRESHOLD_1080P or
-          num_episodes > EPISODE_THRESHOLD_1080P or
-          last_airing_year < YEAR_THRESHOLD_1080P or
-          PROFILE_720p_GENRES.intersection(genres_set)):     
-        return profile_720p_id
-    
-    else:
-        return profile_1080p_id  # Default to profile 1080p if no other condition is met
+def build_condition(profile_name, rating, episodes, year, status_lower):
+    conditions = []
+    profile_conditions = CONDITIONS.get(profile_name, {})
+
+    if profile_conditions.get('USE_RATING', False):
+        if profile_name == '720p':
+            rating_threshold = getattr(globals(), 'RATING_THRESHOLD_720P', 0)
+            rating_condition = f"rating >= {rating_threshold}"
+        else:
+            rating_condition = f"rating >= RATING_THRESHOLD_{profile_name.upper()}"
+        conditions.append(rating_condition)
+        logging.info(f"Rating condition for {profile_name}: {rating_condition}")
+
+    if profile_conditions.get('USE_EPISODES', False):
+        episode_condition = f"episodes < EPISODE_THRESHOLD_{profile_name.upper()}"
+        conditions.append(episode_condition)
+        logging.info(f"Episode condition for {profile_name}: {episode_condition}")
+
+    if profile_conditions.get('USE_YEAR', False):
+        year_condition = f"year >= YEAR_THRESHOLD_{profile_name.upper()}"
+        conditions.append(year_condition)
+        logging.info(f"Year condition for {profile_name}: {year_condition}")
+
+    if profile_conditions.get('USE_GENRES', False):
+        genre_condition = f"any(genre in PROFILE_{profile_name.upper()}_GENRES for genre in genres_set)"
+        conditions.append(genre_condition)
+        logging.info(f"Genre condition for {profile_name}: {genre_condition}")
+
+    if profile_conditions.get('USE_CONTINUING', False):
+        continuing_condition = f"status_lower == 'continuing'"
+        conditions.append(continuing_condition)
+        logging.info(f"Continuing condition for {profile_name}: {continuing_condition}")
+
+    condition_str = " and ".join(conditions)
+    logging.info(f"Condition string for {profile_name}: {condition_str}")
+    return condition_str
+
+def determine_profile_id(status, tmdb_rating, last_airing_date, genres_set, num_episodes, last_airing_year, profile_4k_id, profile_1080p_id, profile_720p_id, rating, episodes, year):
+    status_lower = status.lower()
+    for profile_name in ['4k', '1080p', '720p']:
+        condition = build_condition(profile_name, rating, episodes, year, status_lower)
+        if condition:
+            if eval(condition):
+                logging.info(f"Assigning {profile_name} profile for show with status '{status}', rating {tmdb_rating}, last airing date {last_airing_date}, {num_episodes} episodes, last airing year {last_airing_year}, and genres {genres_set}")
+                logging.info(f"Condition evaluated: {condition}")
+                return locals()[f'profile_{profile_name}_id']
+    logging.info(f"Assigning default 1080p profile for show with status '{status}', rating {tmdb_rating}, last airing date {last_airing_date}, {num_episodes} episodes, last airing year {last_airing_year}, and genres {genres_set}")
+    return profile_1080p_id
+
+
     
 async def process_show(session, show, threshold_date, profile_ids, year_threshold_4k, year_threshold_1080p):
     last_airing = show.get("previousAiring")
@@ -225,15 +300,15 @@ async def process_show(session, show, threshold_date, profile_ids, year_threshol
     genres = await get_genres(session, show['id'])
     status = show['status']
     show_id = show['id']
-    num_episodes = await get_number_of_episodes(session, show_id)
-    last_airing_year = await get_last_airing_year(session, show_id)
+    num_episodes = await get_total_episode_count(session, show_id)
+    last_airing_year = await get_year_of_last_airing(session, show_id)
     
     if last_airing:
         last_airing_date = datetime.strptime(last_airing, "%Y-%m-%dT%H:%M:%SZ")
     else:
         last_airing_date = datetime.min
 
-    profile_id = determine_profile_id(status, tmdb_rating, last_airing_date, genres, num_episodes, threshold_date, last_airing_year, year_threshold_4k, year_threshold_1080p, *profile_ids)
+    profile_id = determine_profile_id(status, tmdb_rating, last_airing_date, genres, num_episodes, last_airing_year, *profile_ids, tmdb_rating, num_episodes, last_airing_year)
     logging.info(f"Updating show '{show_title}' (ID: {show['id']}) to profile ID {profile_id}")
     await update_profile(session, show['id'], profile_id)  
 
@@ -241,7 +316,7 @@ async def main():
     async with aiohttp.ClientSession() as session:
         profiles = await get_profiles(session)
         profile_ids = (
-            get_profile_id(PROFILE_4k_NAME, profiles),
+            get_profile_id(PROFILE_4K_NAME, profiles),
             get_profile_id(PROFILE_1080p_NAME, profiles),
             get_profile_id(PROFILE_720p_NAME, profiles),
         )
