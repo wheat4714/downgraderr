@@ -27,7 +27,7 @@ from dateutil.parser import parse as parse_date
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def read_config(filename):
+def read_config(filename: str) -> Dict[str, Any]:
     with open(filename, 'r') as file:
         return json.load(file)
 
@@ -104,19 +104,19 @@ async def fetch_with_retries(session, url, params=None, headers=None):
 
 # Fetch the TMDB rating for a given show title, using cached data if available.
 async def get_tmdb_rating(session, show_title: str) -> float:
-    show_title_cleaned, year = strip_year_from_title(show_title)
+    show_title_without_year, year = strip_year_from_title(show_title)
     
-    params = {"api_key": TMDB_API_KEY, "query": show_title_cleaned}
+    params = {"api_key": TMDB_API_KEY, "query": show_title_without_year}
     if year:
         params["first_air_date_year"] = year
 
-    data = await fetch_with_retries(session, f"{TMDB_API_URL}/search/tv", params=params)
+    show_details = await fetch_with_retries(session, f"{TMDB_API_URL}/search/tv", params=params)
 
-    if data["total_results"] == 0:
-        logging.warning(f"No results found for '{show_title_cleaned}' on TMDb.")
+    if show_details["total_results"] == 0:
+        logging.warning(f"No results found for '{show_title_without_year}' on TMDb.")
         return 0
     
-    show_id = data["results"][0]["id"]
+    show_id = show_details["results"][0]["id"]
 
     # Check if cached rating exists and is recent
     c.execute("SELECT rating, timestamp FROM ratings WHERE tmdb_id = ?", (show_id,))
@@ -197,17 +197,17 @@ async def get_genres(session, series_id: int) -> List[str]:
     return series_data.get("genres", [])
 
 # Fetch the total number of episodes for a given show.
-async def get_number_of_episodes(session, show_id: int) -> int:
+async def get_total_episode_count(session, show_id: int) -> int:
     headers = {"X-Api-Key": API_KEY}
-    data = await fetch_with_retries(session, f"{SONARR_API_URL}/series/{show_id}", headers=headers)
-    total_episodes = sum(season['statistics']['episodeCount'] for season in data['seasons'] if 'statistics' in season)
+    show_details = await fetch_with_retries(session, f"{SONARR_API_URL}/series/{show_id}", headers=headers)
+    total_episodes = sum(season['statistics']['episodeCount'] for season in show_details['seasons'] if 'statistics' in season)
     return total_episodes
 
 # Fetch the last airing year for a given show.
-async def get_last_airing_year(session, show_id: int) -> int:
+async def get_year_of_last_airing(session, show_id: int) -> int:
     headers = {"X-Api-Key": API_KEY}
-    data = await fetch_with_retries(session, f"{SONARR_API_URL}/series/{show_id}", headers=headers)
-    last_airing = data.get("previousAiring")
+    show_details = await fetch_with_retries(session, f"{SONARR_API_URL}/series/{show_id}", headers=headers)
+    last_airing = show_details.get("previousAiring")
     if last_airing:
         last_airing_year = datetime.strptime(last_airing, "%Y-%m-%dT%H:%M:%SZ").year
         return last_airing_year
@@ -300,8 +300,8 @@ async def process_show(session, show, threshold_date, profile_ids, year_threshol
     genres = await get_genres(session, show['id'])
     status = show['status']
     show_id = show['id']
-    num_episodes = await get_number_of_episodes(session, show_id)
-    last_airing_year = await get_last_airing_year(session, show_id)
+    num_episodes = await get_total_episode_count(session, show_id)
+    last_airing_year = await get_year_of_last_airing(session, show_id)
     
     if last_airing:
         last_airing_date = datetime.strptime(last_airing, "%Y-%m-%dT%H:%M:%SZ")
