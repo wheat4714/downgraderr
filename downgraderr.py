@@ -164,14 +164,31 @@ async def get_series(session, series_id: int) -> Dict[str, Any]:
     series = await fetch_with_retries(session, f"{SONARR_API_URL}/series/{series_id}", headers=headers)
     return series
 
-# Update the quality profile for a given series.
-async def update_profile(session, series_id: int, profile_id: int) -> Dict[str, Any]:
+# Create the table for logging profile changes if it doesn't exist
+c.execute('''CREATE TABLE IF NOT EXISTS profile_changes
+             (id INTEGER PRIMARY KEY, series_id INTEGER, old_profile_id INTEGER, new_profile_id INTEGER, timestamp TEXT)''')
+
+# Update the quality profile for a given series and log the change if applicable
+async def update_profile(session, series_id: int, new_profile_id: int) -> Dict[str, Any]:
     series_data = await get_series(session, series_id)
-    series_data['qualityProfileId'] = profile_id
-    headers = {"X-Api-Key": API_KEY}
-    async with session.put(f"{SONARR_API_URL}/series/{series_id}", headers=headers, json=series_data) as response:
-        updated_series = await response.json()
-    return updated_series
+    old_profile_id = series_data['qualityProfileId']
+
+    if old_profile_id != new_profile_id:
+        series_data['qualityProfileId'] = new_profile_id
+        headers = {"X-Api-Key": API_KEY}
+        async with session.put(f"{SONARR_API_URL}/series/{series_id}", headers=headers, json=series_data) as response:
+            updated_series = await response.json()
+
+        # Log the profile change
+        timestamp_str = datetime.now().isoformat()
+        c.execute("INSERT INTO profile_changes (series_id, old_profile_id, new_profile_id, timestamp) VALUES (?, ?, ?, ?)",
+                  (series_id, old_profile_id, new_profile_id, timestamp_str))
+        conn.commit()
+        logging.info(f"Logged profile change for series {series_id}: {old_profile_id} -> {new_profile_id}")
+    else:
+        logging.info(f"No profile change needed for series {series_id}")
+
+    return series_data
 
 # Fetch genres for a given series.
 async def get_genres(session, series_id: int) -> List[str]:
