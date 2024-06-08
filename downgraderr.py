@@ -3,7 +3,7 @@ import subprocess
 # Define a dictionary with required packages and imported modules
 dependencies = {
     'packages': ['requests', 'aiohttp', 'python-dateutil'],
-    'modules': ['json', 'os', 're', 'logging', 'asyncio', 'typing', 'aiohttp', 'datetime', 'dateutil.parser']
+    'modules': ['json', 'os', 're', 'logging', 'asyncio', 'typing', 'aiohttp', 'sqlite3', 'datetime', 'dateutil.parser']
 }
 
 # Check and install required packages
@@ -82,6 +82,14 @@ def strip_year_from_title(title: str) -> Tuple[str, int]:
         return title_cleaned, year
     return title, None
 
+# Create or connect to the database
+conn = sqlite3.connect('ratings.db')
+c = conn.cursor()
+
+# Create the table if it doesn't exist
+c.execute('''CREATE TABLE IF NOT EXISTS ratings
+             (id INTEGER PRIMARY KEY, tmdb_id INTEGER, rating REAL, timestamp TEXT)''')
+
 # Helper function to make HTTP requests with retries
 async def fetch_with_retries(session, url, params=None, headers=None):
     for attempt in range(MAX_RETRIES):
@@ -97,8 +105,6 @@ async def fetch_with_retries(session, url, params=None, headers=None):
 # Fetch the TMDB rating for a given show title, using cached data if available.
 async def get_tmdb_rating(session, show_title: str) -> float:
     show_title_cleaned, year = strip_year_from_title(show_title)
-    cache_dir = os.path.join(CACHE_DIR, "tmdb_cache")
-    os.makedirs(cache_dir, exist_ok=True)
     
     params = {"api_key": TMDB_API_KEY, "query": show_title_cleaned}
     if year:
@@ -111,25 +117,25 @@ async def get_tmdb_rating(session, show_title: str) -> float:
         return 0
     
     show_id = data["results"][0]["id"]
-    cache_file = os.path.join(cache_dir, f"{show_id}.json")
 
     # Check if cached rating exists and is recent
-    if os.path.exists(cache_file):
-        with open(cache_file, "r") as f:
-            cached_data = json.load(f)
-            if "timestamp" in cached_data and "rating" in cached_data:
-                timestamp = datetime.fromisoformat(cached_data["timestamp"])
-                if datetime.now() - timestamp < timedelta(days=7):
-                    logging.info(f"Using cached rating for TMDB ID '{show_id}'")
-                    return float(cached_data["rating"])
+    c.execute("SELECT rating, timestamp FROM ratings WHERE tmdb_id = ?", (show_id,))
+    cached_data = c.fetchone()
+    if cached_data:
+        rating, timestamp_str = cached_data
+        timestamp = datetime.fromisoformat(timestamp_str)
+        if datetime.now() - timestamp < timedelta(days=7):
+            logging.info(f"Using cached rating for TMDB ID '{show_id}'")
+            return rating
     
+    # Fetch rating from TMDB API
     show_data = await fetch_with_retries(session, f"{TMDB_API_URL}/tv/{show_id}", params={"api_key": TMDB_API_KEY})
     rating = show_data["vote_average"]
     
     # Cache the rating
-    cache_data = {"rating": rating, "timestamp": datetime.now().isoformat()}
-    with open(cache_file, "w") as f:
-        json.dump(cache_data, f)
+    timestamp_str = datetime.now().isoformat()
+    c.execute("INSERT OR REPLACE INTO ratings (tmdb_id, rating, timestamp) VALUES (?, ?, ?)", (show_id, rating, timestamp_str))
+    conn.commit()
     
     return rating
 
