@@ -6,6 +6,8 @@ This project is under heavy development. Use it at your own risk.
 
 This project is a collection of scripts designed to assign quality profiles to sonarr/radarr based on set criteria. The scripts support many different conditions, all of which are user-configurable.
 
+Dependencies are auto-installed by the script. SQLite is used to cache TMDB ratings and to log quality profile changes.
+
 **Problems solved**
 - Comedy/Family shows, old shows, shows with thousands of episodes do not eat up all the space in the server.
 - Action/Sci-Fi is grabbed at the highest quality setting to ensure it gets the quality it deserves
@@ -18,9 +20,9 @@ This project is a collection of scripts designed to assign quality profiles to s
 
 **To do**
 - Lidarr script
+- Dry run mode
 - Plex conditions
 - Package as Docker container to run as a node
 - Write instructions to integrate using native radarr/sonarr scripting support
 - Make the profiles into a list instead of hardcoded profile1,2,3
-- Rewrite all the elseifs to use switches instead, to improve scaling and flexibility with a configurable number of profiles
 
